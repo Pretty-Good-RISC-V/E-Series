@@ -1,0 +1,6 @@
+[submodule "cmake/PGRV-cmake"]
+	path = cmake/PGRV-cmake
+	url = git@github.com:Pretty-Good-RISC-V/PGRV-cmake.git
+[submodule "cmake/BSV-cmake"]
+	path = cmake/BSV-cmake
+	url = git@github.com:Pretty-Good-RISC-V/BSV-cmake.git

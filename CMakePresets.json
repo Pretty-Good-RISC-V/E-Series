@@ -1,0 +1,126 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 21,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "base",
+      "displayName": "Base Config",
+      "hidden": true,
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "environment": {
+        "CTEST_OUTPUT_ON_FAILURE": "True"
+      },
+      "cacheVariables": {
+        "BUILD_PRESET" : {
+          "type": "STRING",
+          "value": "${presetName}"
+        }
+      }
+    },
+    {
+      "name": "e00x_32",
+      "displayName": "E00X (RV32I)",
+      "inherits": "base",
+      "cacheVariables": {
+        "BASE_ISA": {
+          "type": "STRING",
+          "value": "RV32"
+        },
+        "ENABLE_ISA_TESTS": {
+          "type": "BOOL",
+          "value": "ON"
+        },
+        "ENABLE_INSTRUCTION_LOGGING": {
+          "type": "BOOL",
+          "value": "ON"
+        }
+      }
+    },
+    {
+      "name": "e00x_32_riscof_tests",
+      "displayName": "E00X (RV32I) RISCOF_TESTS",
+      "inherits": "e00x_32",
+      "cacheVariables": {
+        "ENABLE_RISCOF_TESTS": {
+          "type": "BOOL",
+          "value": "ON"
+        },
+        "ENABLE_ISA_TESTS": {
+          "type": "BOOL",
+          "value": "OFF"
+        },
+        "ENABLE_INSTRUCTION_LOGGING": {
+          "type": "BOOL",
+          "value": "ON"
+        }
+      }
+    },
+    {
+      "name": "e00x_64",
+      "displayName": "E00X (RV64I)",
+      "inherits": "base",
+      "cacheVariables": {
+        "BASE_ISA": {
+          "type": "STRING",
+          "value": "RV64"
+        },
+        "ENABLE_ISA_TESTS": {
+          "type": "BOOL",
+          "value": "ON"
+        },
+        "ENABLE_INSTRUCTION_LOGGING": {
+          "type": "BOOL",
+          "value": "ON"
+        }
+      }
+    },
+    {
+      "name": "e00x_64_riscof_tests",
+      "displayName": "E00X (RV64I) RISCOF_TESTS",
+      "inherits": "e00x_64",
+      "cacheVariables": {
+        "ENABLE_RISCOF_TESTS": {
+          "type": "BOOL",
+          "value": "ON"
+        },
+        "ENABLE_ISA_TESTS": {
+          "type": "BOOL",
+          "value": "OFF"
+        },
+        "ENABLE_INSTRUCTION_LOGGING": {
+          "type": "BOOL",
+          "value": "ON"
+        }
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "default",
+      "configurePreset": "default"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "default",
+      "configurePreset": "default",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "noTestsAction": "error",
+        "stopOnFailure": true
+      }
+    }
+  ],
+  "vendor": {
+    "example.com/ExampleIDE/1.0": {
+      "autoFormat": false
+    }
+  }
+}
