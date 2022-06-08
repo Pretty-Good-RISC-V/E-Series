@@ -6,7 +6,7 @@ typedef struct {
 } ALUResult deriving(Bits, Eq, FShow);
 
 interface ALU;
-    method ALUResult execute(RVALUOperator aluOperation, Word operand1, Word operand2);
+    method ActionValue#(ALUResult) calculate(RVALUOperator aluOperation, Word operand1, Word operand2);
 endinterface
 
 module mkALU(ALU);
@@ -20,7 +20,7 @@ module mkALU(ALU);
         return (signedOperand1 < signedOperand2 ? 1 : 0);
     endfunction
 
-    method ALUResult execute(RVALUOperator aluOperation, Word operand1, Word operand2);
+    method ActionValue#(ALUResult) calculate(RVALUOperator aluOperation, Word operand1, Word operand2);
         Word result = ?;
         Bool illegalOperation = False;
 
@@ -65,6 +65,7 @@ module mkALU(ALU);
             end     
 `endif   
             default: begin
+                $display("ALU: Illegal ALU operation: $0x", aluOperation);
                 result = 0;
                 illegalOperation = True;
             end

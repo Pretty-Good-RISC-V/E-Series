@@ -172,7 +172,7 @@ module mkALU_ESeries_tb(Empty);
     rule runme;
         let testCase = testCases[testNumber];
         // Perform the test
-        let aluResult = dut.execute(testCase.operator, testCase.operand1, testCase.operand2);
+        let aluResult <- dut.calculate(testCase.operator, testCase.operand1, testCase.operand2);
 
         // Check results
         if (aluResult.illegalOperation != testCase.expectedIllegalOpcode) begin
