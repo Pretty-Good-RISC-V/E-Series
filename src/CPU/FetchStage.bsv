@@ -14,6 +14,7 @@ typedef enum {
 
 interface FetchStage;
     method ActionValue#(IF_ID) fetch(ProgramCounter programCounter, EX_MEM ex_mem, Put#(ProgramCounter) putProgramCounter);
+    method Bool isStalled;
     interface ReadOnlyMemoryClient#(XLEN, 32) instructionMemoryClient;
 endinterface
 
@@ -66,6 +67,10 @@ module mkFetchStage(FetchStage);
 
         putNextProgramCounter.put(npc);
         return if_id;
+    endmethod
+
+    method Bool isStalled;
+        return (state == WAITING_FOR_FETCH_RESPONSE);
     endmethod
 
     interface ReadOnlyMemoryClient instructionMemoryClient = toGPClient(instructionMemoryRequest, instructionMemoryResponse);
