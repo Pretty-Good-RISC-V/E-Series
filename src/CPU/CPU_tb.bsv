@@ -1,6 +1,7 @@
 import PGRV::*;
 import CPU::*;
 import MemoryIO::*;
+import ProgramMemory::*;
 
 import Assert::*;
 import ClientServer::*;
@@ -13,7 +14,7 @@ module mkCPU_tb(Empty);
     CPU dut <- mkCPU;
 
     // Cycle counter
-    Reg#(Bit#(XLEN)) cycle    <- mkReg(0);    
+    Reg#(Bit#(XLEN)) cycle <- mkReg(0);    
     rule cycleCounter;
         cycle <= cycle + 1;
     endrule

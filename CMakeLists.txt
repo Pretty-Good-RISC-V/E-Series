@@ -12,3 +12,4 @@ project(E100 BSV CXX)
 enable_testing()
 
 add_subdirectory(src)
+add_subdirectory(test)
