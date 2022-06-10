@@ -50,6 +50,9 @@ module mkCPU(CPU);
     RWire#(RetiredInstruction) retiredInstruction <- mkRWire;
 
     rule pipeline;
+        //
+        // Process the pipeline
+        //
         let if_id_  <- fetchStage.fetch(pc, ex_mem, toPut(asIfc(nextPC)));
         let id_ex_  <- decodeStage.decode(if_id, gprFile.gprReadPort1, gprFile.gprReadPort2);
         let ex_mem_ <- executeStage.execute(id_ex);
@@ -58,12 +61,18 @@ module mkCPU(CPU);
 
         let stalled = fetchStage.isStalled || memoryStage.isStalled;
         if (!stalled) begin
+            //
+            // Update the pipeline registers
+            //
             pc     <= nextPC;
             if_id  <= if_id_;
             id_ex  <= id_ex_;
             ex_mem <= ex_mem_;
             mem_wb <= mem_wb_;
 
+            //
+            // Increment cycle counters
+            //
             csrFile.incrementCycleCounters;
 
             //
