@@ -10,12 +10,13 @@ import FIFO::*;
 
 (* synthesize *)
 module mkTestHost(Empty);
-    // Device under test (DUT)
+    // CPU
     CPU cpu <- mkCPU;
 
     // Program memory
     ProgramMemory#(XLEN, XLEN) programMemory <- mkProgramMemory;
 
+    // Connect program memory to CPU
     mkConnection(programMemory.instructionMemoryServer, cpu.instructionMemoryClient);
     mkConnection(programMemory.dataMemoryServer, cpu.dataMemoryClient);
 

@@ -3,11 +3,11 @@ import GPRFile::*;
 import PipelineRegisters::*;
 
 interface WritebackStage;
-    method Action writeback(MEM_WB mem_wb, GPRWritePort gprWritePort);
+    method ActionValue#(PipelineRegisterCommon) writeback(MEM_WB mem_wb, GPRWritePort gprWritePort);
 endinterface
 
 module mkWritebackStage(WritebackStage);
-    method Action writeback(MEM_WB mem_wb, GPRWritePort gprWritePort);
+    method ActionValue#(PipelineRegisterCommon) writeback(MEM_WB mem_wb, GPRWritePort gprWritePort);
         let opcode = mem_wb.common.instruction[6:0];
         let rd_    = mem_wb.common.instruction[11:7];
 
@@ -24,5 +24,7 @@ module mkWritebackStage(WritebackStage);
         endcase;
 
         gprWritePort.write(rd, value);
+
+        return mem_wb.common;
     endmethod
 endmodule

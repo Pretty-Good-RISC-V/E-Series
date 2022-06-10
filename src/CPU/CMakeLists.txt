@@ -1,11 +1,14 @@
 find_package(PGRVCommon)
 
+add_subdirectory(CSRs)
+
 add_library(CPU INTERFACE)
 add_library(CPU::CPU ALIAS CPU)
 
 target_include_directories(CPU INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(CPU INTERFACE
     PGRVCommon::PGRVCommon
+    CSRs::CSRs
 )
 
 #
@@ -21,6 +24,7 @@ foreach(TEST_FILE ${TEST_FILES})
     )
     target_link_libraries(${TEST_TARGET}
         PGRVCommon::PGRVCommon
+        CSRs::CSRs
     )
     add_test(
         NAME ${TEST_TARGET}
