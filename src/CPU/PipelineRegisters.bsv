@@ -1,4 +1,5 @@
 import PGRV::*;
+import Trap::*;
 
 import DefaultValue::*;
 
@@ -10,7 +11,7 @@ typedef struct {
     Word programCounter;
     Bool isBubble;
 
-    Maybe#(RVExceptionCause) exceptionCause;
+    Maybe#(Trap) trap;
 } PipelineRegisterCommon deriving(Bits, Eq, FShow);
 
 instance DefaultValue #(PipelineRegisterCommon);
@@ -18,7 +19,7 @@ instance DefaultValue #(PipelineRegisterCommon);
         instruction: 32'b0000000_00000_00000_000_00000_0110011, // ADD x0, x0, x0
         programCounter: 'hc0dec0de,
         isBubble: True,
-        exceptionCause: tagged Invalid
+        trap: tagged Invalid
     };
 endinstance
 

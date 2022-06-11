@@ -11,7 +11,7 @@ import FIFO::*;
 (* synthesize *)
 module mkCPU_tb(Empty);
     // Device under test (DUT)
-    CPU dut <- mkCPU;
+    CPU dut <- mkCPU('h8000_0000);
 
     // Cycle counter
     Reg#(Bit#(XLEN)) cycle <- mkReg(0);    

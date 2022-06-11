@@ -2,6 +2,7 @@ import PGRV::*;
 import ALU::*;
 import BranchUnit::*;
 import PipelineRegisters::*;
+import Trap::*;
 
 interface ExecuteStage;
     method ActionValue#(EX_MEM) execute(ID_EX id_ex);
@@ -51,9 +52,12 @@ module mkExecuteStage(ExecuteStage);
 
         // If an exception is passed in, forward it - otherwise indicate if
         // the current instruction is illegal.
-        Maybe#(RVExceptionCause) exceptionCause = id_ex.common.exceptionCause;
-        if (!isValid(exceptionCause)) begin
-            exceptionCause = (isIllegal ? tagged Invalid : tagged Valid exception_ILLEGAL_INSTRUCTION);
+        Maybe#(Trap) trap = id_ex.common.trap;
+        if (!isValid(trap)) begin
+            trap = (isIllegal ? tagged Valid Trap {
+                cause: exception_ILLEGAL_INSTRUCTION,
+                isInterrupt: False
+            } : tagged Invalid);
         end
 
         return EX_MEM {
@@ -61,7 +65,7 @@ module mkExecuteStage(ExecuteStage);
                 instruction: id_ex.common.instruction,
                 programCounter: id_ex.common.programCounter,
                 isBubble: id_ex.common.isBubble,
-                exceptionCause: exceptionCause
+                trap: trap
             },
             aluOutput: (isALU ? aluResult.result : (isBranch ? pack(branchTarget) : pack(loadStoreTarget))),
             b: id_ex.b,

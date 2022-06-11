@@ -2,6 +2,7 @@ import PGRV::*;
 
 import MemoryIO::*;
 import PipelineRegisters::*;
+import Trap::*;
 
 import ClientServer::*;
 import FIFO::*;
@@ -13,7 +14,7 @@ typedef enum {
 } FetchState deriving(Bits, Eq, FShow);
 
 interface FetchStage;
-    method ActionValue#(IF_ID) fetch(ProgramCounter programCounter, EX_MEM ex_mem, Put#(ProgramCounter) putProgramCounter);
+    method ActionValue#(IF_ID) fetch(ProgramCounter programCounter, EX_MEM ex_mem, Put#(ProgramCounter) putNextProgramCounter);
     method Bool isStalled;
     interface ReadOnlyMemoryClient#(XLEN, 32) instructionMemoryClient;
 endinterface
@@ -51,7 +52,10 @@ module mkFetchStage(FetchStage);
                     if_id.nextProgramCounter = npc;
 
                     if (response.denied) begin
-                        if_id.common.exceptionCause = tagged Valid exception_INSTRUCTION_ACCESS_FAULT;
+                        if_id.common.trap = tagged Valid Trap {
+                            cause: exception_INSTRUCTION_ACCESS_FAULT,
+                            isInterrupt: False
+                        };
                     end
 
                     nextState = WAITING_FOR_FETCH_REQUEST;

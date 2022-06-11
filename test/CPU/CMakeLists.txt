@@ -9,6 +9,7 @@ target_compile_definitions(${TEST_TARGET} PUBLIC
 target_link_libraries(${TEST_TARGET}
     PGRVCommon::PGRVCommon
     CPU::CPU
+    InstructionLogger::InstructionLogger
 )
 add_test(
     NAME ${TEST_TARGET}

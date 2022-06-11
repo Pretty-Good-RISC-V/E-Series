@@ -24,14 +24,16 @@ interface CPU;
     interface Get#(Maybe#(RetiredInstruction))   getRetiredInstruction;
 endinterface
 
-module mkCPU(CPU);
+module mkCPU#(
+    ProgramCounter initialProgramCounter
+)(CPU);
     // Pipeline Registers
-    Reg#(Word)   pc     <- mkReg('h8000_0000);
-    Reg#(Word)   nextPC <- mkRegU;
-    Reg#(IF_ID)  if_id  <- mkReg(defaultValue);
-    Reg#(ID_EX)  id_ex  <- mkReg(defaultValue);
-    Reg#(EX_MEM) ex_mem <- mkReg(defaultValue);
-    Reg#(MEM_WB) mem_wb <- mkReg(defaultValue);
+    Reg#(ProgramCounter) pc     <- mkReg(initialProgramCounter);
+    Reg#(ProgramCounter) nextPC <- mkRegU;
+    Reg#(IF_ID)          if_id  <- mkReg(defaultValue);
+    Reg#(ID_EX)          id_ex  <- mkReg(defaultValue);
+    Reg#(EX_MEM)         ex_mem <- mkReg(defaultValue);
+    Reg#(MEM_WB)         mem_wb <- mkReg(defaultValue);
 
     // General purpose register (GPR) file
     GPRFile gprFile <- mkGPRFile;
@@ -64,11 +66,23 @@ module mkCPU(CPU);
             //
             // Update the pipeline registers
             //
-            pc     <= nextPC;
             if_id  <= if_id_;
             id_ex  <= id_ex_;
             ex_mem <= ex_mem_;
             mem_wb <= mem_wb_;
+
+            //
+            // Check for traps (and update the program counter if one exists)
+            //
+            let updatedPC = nextPC;
+            if (wb_out_.trap matches tagged Valid .trap) begin
+                updatedPC <- csrFile.trapController.beginTrap(trap);
+            end
+
+            //
+            // Update the program counter
+            //
+            pc <= updatedPC;
 
             //
             // Increment cycle counters

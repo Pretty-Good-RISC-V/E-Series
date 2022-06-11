@@ -39,7 +39,7 @@ module mkMemoryStage(MemoryStage);
         if (state == WAITING_FOR_MEMORY_RESPONSE) begin
             // Request is in flight
             dynamicAssert(isLoadStore, "");
-        end else if (!isValid(ex_mem.common.exceptionCause) && isLoadStore) begin
+        end else if (!isValid(ex_mem.common.trap) && isLoadStore) begin
         end
 
         return mem_wb;

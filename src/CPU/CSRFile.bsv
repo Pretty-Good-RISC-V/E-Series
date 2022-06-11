@@ -1,6 +1,7 @@
 import PGRV::*;
 import CSRs::*;
 import ReadOnly::*;
+import Trap::*;
 
 import Cntrs::*;
 
@@ -21,12 +22,19 @@ interface CSRWritePort;
     method ActionValue#(CSRWriteResult) writeCSR(RVCSRIndex index, Word value);
 endinterface
 
+interface TrapController;
+    method ActionValue#(ProgramCounter) beginTrap(Trap trap);
+    method ActionValue#(ProgramCounter) endTrap;
+endinterface
+
 interface CSRFile;
     method Action incrementCycleCounters;
     method Action incrementInstructionsRetiredCounter;
 
     interface CSRReadPort  csrReadPort;
     interface CSRWritePort csrWritePort;
+
+    interface TrapController trapController;
 endinterface
 
 (* synthesize *)
@@ -60,6 +68,9 @@ module mkCSRFile(CSRFile);
     Reg#(Word)              mideleg             <- mkReg(0);
     Reg#(Word)              medeleg             <- mkReg(0);
 
+    Reg#(Word)              sideleg             <- mkReg(0);
+    Reg#(Word)              sedeleg             <- mkReg(0);
+
     function Bool isWARLIgnore(RVCSRIndex index);
         Bool result = False;
         if ((index >= csr_PMPADDR0 && index <= csr_PMPADDR63) ||
@@ -71,6 +82,57 @@ module mkCSRFile(CSRFile);
         end
 
         return result;
+    endfunction
+
+    function RVCSRIndex getIndex(RVPrivilegeLevel privilegeLevel, RVCSRIndexOffset offset);
+        RVCSRIndex index = 0;
+        index[9:8] = privilegeLevel[1:0];
+        index[7:0] = offset;
+        return index;
+    endfunction
+
+    // Based on fv_new_priv_on_exception from Flute processor.
+    function RVPrivilegeLevel getTrapPrivilegeLevel(Trap trap);
+        let trapPrivilegeLevel = priv_MACHINE;
+
+        if (currentPriv < priv_MACHINE) begin
+            if (misa.extS) begin    // S mode supported?
+                // See if this trap should be delegated to SUPERVISOR mode
+                let delegated = (trap.isInterrupt ? 
+                    (mideleg[trap.cause] == 0 ? False : True) :
+                    (medeleg[trap.cause] == 0 ? False : True));
+
+                if (delegated) begin
+                    trapPrivilegeLevel = priv_SUPERVISOR;
+
+                    // If the current priv mode is U, and user mode traps are supported,
+	                // then consult sedeleg/sideleg to determine if delegated to USER mode.                    
+                    if (currentPriv == priv_USER && misa.extN) begin
+                        delegated = (trap.isInterrupt ? 
+                            (sideleg[trap.cause] == 0 ? False : True) :
+                            (sedeleg[trap.cause] == 0 ? False : True));
+
+                        if (delegated) begin
+                            trapPrivilegeLevel = priv_USER;
+                        end
+                    end
+                end
+            end else begin // S mode *NOT* supported
+                // If user mode traps are supported, then consult sedeleg/sideleg to determine 
+                // if delegated to USER mode.                    
+                if (misa.extN) begin
+                    let delegated = (trap.isInterrupt ? 
+                        (mideleg[trap.cause] == 0 ? False : True) :
+                        (medeleg[trap.cause] == 0 ? False : True));
+
+                    if (delegated) begin
+                        trapPrivilegeLevel = priv_USER;
+                    end
+                end
+            end
+        end
+
+        return trapPrivilegeLevel;
     endfunction
 
     //
@@ -195,6 +257,19 @@ module mkCSRFile(CSRFile);
             end
 
             return result;
+        endmethod
+    endinterface
+
+    //
+    // trapController
+    //
+    interface TrapController trapController;
+        method ActionValue#(ProgramCounter) beginTrap(Trap trap);
+            return 0;
+        endmethod
+
+        method ActionValue#(ProgramCounter) endTrap;
+            return 0;
         endmethod
     endinterface
 
