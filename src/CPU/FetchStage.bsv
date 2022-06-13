@@ -14,7 +14,7 @@ typedef enum {
 } FetchState deriving(Bits, Eq, FShow);
 
 interface FetchStage;
-    method ActionValue#(IF_ID) fetch(ProgramCounter programCounter, EX_MEM ex_mem, Put#(ProgramCounter) putNextProgramCounter);
+    method ActionValue#(IF_ID) fetch(ProgramCounter programCounter, EX_MEM ex_mem);
     method Bool isStalled;
     interface ReadOnlyMemoryClient#(XLEN, 32) instructionMemoryClient;
 endinterface
@@ -24,8 +24,9 @@ module mkFetchStage(FetchStage);
     RWire#(FallibleMemoryResponse#(32))      instructionMemoryResponse <- mkRWire;
 
     Reg#(FetchState) state <- mkReg(WAITING_FOR_FETCH_REQUEST);
+    Wire#(FetchState) curState <- mkWire;
 
-    method ActionValue#(IF_ID) fetch(ProgramCounter programCounter, EX_MEM ex_mem, Put#(ProgramCounter) putNextProgramCounter);
+    method ActionValue#(IF_ID) fetch(ProgramCounter programCounter, EX_MEM ex_mem);
         IF_ID if_id = defaultValue;
 
         let npc = programCounter;
@@ -68,8 +69,6 @@ module mkFetchStage(FetchStage);
         endcase
 
         state <= nextState;
-
-        putNextProgramCounter.put(npc);
         return if_id;
     endmethod
 

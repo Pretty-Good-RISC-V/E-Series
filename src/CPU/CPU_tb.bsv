@@ -1,7 +1,6 @@
 import PGRV::*;
 import CPU::*;
 import MemoryIO::*;
-import ProgramMemory::*;
 
 import Assert::*;
 import ClientServer::*;
@@ -11,7 +10,7 @@ import FIFO::*;
 (* synthesize *)
 module mkCPU_tb(Empty);
     // Device under test (DUT)
-    CPU dut <- mkCPU('h8000_0000);
+    CPU dut <- mkCPU(0);
 
     // Cycle counter
     Reg#(Bit#(XLEN)) cycle <- mkReg(0);    
@@ -20,11 +19,38 @@ module mkCPU_tb(Empty);
     endrule
 
     //
+    // Program Memory
+    // https://riscvasm.lucasteske.dev/#
+    //
+    // 0000000000000000 <_boot>:
+    //    0:	00a00093          	li	ra,10
+    //    4:	01400113          	li	sp,20
+    //    8:	01e00493          	li	s1,30
+    //    c:	002081b3          	add	gp,ra,sp
+    //   10:	00919463          	bne	gp,s1,18 <_fail>
+    //
+    // 0000000000000014 <_pass>:
+    //   14:	0000006f          	j	14 <_pass>
+    //
+    // 0000000000000018 <_fail>:
+    //   18:	fe9ff06f          	j	0 <_boot>
+    //
+    let instructionCount = 7;
+    Word32 programMemory[instructionCount] = {
+        'h00a00093,
+        'h01400113,
+        'h01e00493,
+        'h002081b3,
+        'h00919463,
+        'h0000006f,
+        'hfe9ff06f
+    };
+    //
     // Simulated instruction memory server
     //
     FIFO#(ReadOnlyMemoryRequest#(XLEN, 32)) instructionMemoryRequests <- mkFIFO;
     RWire#(FallibleMemoryResponse#(32))     instructionMemoryResponse <- mkRWire;
-    Reg#(Bit#(2)) instructionMemoryLatencyCounter <- mkReg(~0);
+    Reg#(Bit#(0)) instructionMemoryLatencyCounter <- mkReg(~0);
     mkConnection(dut.instructionMemoryClient, toGPServer(instructionMemoryRequests, instructionMemoryResponse));
 
     rule instructionMemoryRequest;
@@ -41,10 +67,20 @@ module mkCPU_tb(Empty);
             $display("Cycle : %0d", cycle);
             $display("IMemory latency expired - responding to memory request: ", fshow(memoryRequest));
 
-            instructionMemoryResponse.wset(FallibleMemoryResponse {
-                data: memoryRequest.address,
-                denied: False
-            });
+            let wordIndex = memoryRequest.address >> 2;
+            if (wordIndex < instructionCount) begin
+                instructionMemoryResponse.wset(FallibleMemoryResponse {
+                    data: programMemory[wordIndex],
+                    denied: False
+                });
+            end else begin
+                instructionMemoryResponse.wset(FallibleMemoryResponse {
+                    data: 'hCCCC_CCCC,
+                    denied: True
+                });
+                $display("Exitting on invalid instruction memory access: $%0x", memoryRequest.address);
+                $fatal();
+            end
         end
 
         instructionMemoryLatencyCounter <= instructionMemoryLatencyCounter - 1;
@@ -72,10 +108,20 @@ module mkCPU_tb(Empty);
             $display("Cycle : %0d", cycle);
             $display("DMemory latency expired - responding to memory request: ", fshow(memoryRequest));
 
-            dataMemoryResponse.wset(FallibleMemoryResponse {
-                data: memoryRequest.address,
-                denied: False
-            });
+            let wordIndex = memoryRequest.address >> 2;
+            if (wordIndex < instructionCount) begin
+                dataMemoryResponse.wset(FallibleMemoryResponse {
+                    data: programMemory[wordIndex],
+                    denied: False
+                });
+            end else begin
+                dataMemoryResponse.wset(FallibleMemoryResponse {
+                    data: 'hCCCC_CCCC,
+                    denied: True
+                });
+                $display("Exitting on invalid data memory access: $%0x", memoryRequest.address);
+                $fatal();
+            end
         end
 
         dataMemoryLatencyCounter <= dataMemoryLatencyCounter - 1;
