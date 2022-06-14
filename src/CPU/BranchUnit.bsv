@@ -16,7 +16,6 @@ module mkBranchUnit(BranchUnit);
 
         case (branchOperation)
             default: begin
-                $display("BranchUnit: Illegal branch operation: $0x", branchOperation);
                 illegalOperation = True;
             end
         endcase

@@ -62,6 +62,7 @@ module mkDecodeStage(DecodeStage);
 
         return ID_EX {
             common: if_id.common,
+            epoch: if_id.epoch,
             nextProgramCounter: if_id.nextProgramCounter,
             a: a,
             b: b,

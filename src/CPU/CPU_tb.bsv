@@ -56,16 +56,8 @@ module mkCPU_tb(Empty);
     rule instructionMemoryRequest;
         if (instructionMemoryLatencyCounter > 0) begin
             let memoryRequest = instructionMemoryRequests.first();
-            $display("---------------");
-            $display("Cycle : %0d", cycle);
-            $display("IMemory request received: ", fshow(memoryRequest));
-            $display("IMemory delay cycles remaining: ", instructionMemoryLatencyCounter);
         end else begin
             let memoryRequest <- pop(instructionMemoryRequests);
-
-            $display("---------------");
-            $display("Cycle : %0d", cycle);
-            $display("IMemory latency expired - responding to memory request: ", fshow(memoryRequest));
 
             let wordIndex = memoryRequest.address >> 2;
             if (wordIndex < instructionCount) begin
@@ -91,7 +83,7 @@ module mkCPU_tb(Empty);
     //
     FIFO#(MemoryRequest#(XLEN, XLEN))     dataMemoryRequests <- mkFIFO;
     RWire#(FallibleMemoryResponse#(XLEN)) dataMemoryResponse <- mkRWire;
-    Reg#(Bit#(3)) dataMemoryLatencyCounter <- mkReg(~0);
+    Reg#(Bit#(0)) dataMemoryLatencyCounter <- mkReg(~0);
     mkConnection(dut.dataMemoryClient, toGPServer(dataMemoryRequests, dataMemoryResponse));
 
     rule handleDataMemoryRequest;

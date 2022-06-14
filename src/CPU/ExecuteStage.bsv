@@ -5,7 +5,7 @@ import PipelineRegisters::*;
 import Trap::*;
 
 interface ExecuteStage;
-    method ActionValue#(EX_MEM) execute(ID_EX id_ex);
+    method ActionValue#(EX_MEM) execute(ID_EX id_ex, Bit#(1) epoch);
 endinterface
 
 module mkExecuteStage(ExecuteStage);
@@ -20,7 +20,7 @@ module mkExecuteStage(ExecuteStage);
         end
     endfunction
 
-    method ActionValue#(EX_MEM) execute(ID_EX id_ex);
+    method ActionValue#(EX_MEM) execute(ID_EX id_ex, Bit#(1) epoch);
         let func7  = id_ex.common.instruction[31:25];
         let func3  = id_ex.common.instruction[14:12];
         let opcode = id_ex.common.instruction[6:0];
@@ -50,26 +50,31 @@ module mkExecuteStage(ExecuteStage);
                               (isLoadStore && !loadStoreValid) ||
                               isUnknownOpcode;
 
-        // If an exception is passed in, forward it - otherwise indicate if
-        // the current instruction is illegal.
-        Maybe#(Trap) trap = id_ex.common.trap;
-        if (!isValid(trap)) begin
-            trap = (isIllegal ? tagged Valid Trap {
-                cause: exception_ILLEGAL_INSTRUCTION,
-                isInterrupt: False
-            } : tagged Invalid);
-        end
+        if (id_ex.epoch != epoch) begin
+            $display("Execute stage epoch mismatch - inserting bubble");
+            return defaultValue;
+        end else begin
+            // If an exception is passed in, forward it - otherwise indicate if
+            // the current instruction is illegal.
+            Maybe#(Trap) trap = id_ex.common.trap;
+            if (!isValid(trap)) begin
+                trap = (isIllegal ? tagged Valid Trap {
+                    cause: exception_ILLEGAL_INSTRUCTION,
+                    isInterrupt: False
+                } : tagged Invalid);
+            end
 
-        return EX_MEM {
-            common: PipelineRegisterCommon {
-                instruction: id_ex.common.instruction,
-                programCounter: id_ex.common.programCounter,
-                isBubble: id_ex.common.isBubble,
-                trap: trap
-            },
-            aluOutput: (isALU ? aluResult.result : (isBranch ? pack(branchTarget) : pack(loadStoreTarget))),
-            b: id_ex.b,
-            branchTaken: (isBranch ? branchResult.taken : False)
-        };
+            return EX_MEM {
+                common: PipelineRegisterCommon {
+                    instruction: id_ex.common.instruction,
+                    programCounter: id_ex.common.programCounter,
+                    isBubble: id_ex.common.isBubble,
+                    trap: trap
+                },
+                aluOutput: (isALU ? aluResult.result : (isBranch ? pack(branchTarget) : pack(loadStoreTarget))),
+                b: id_ex.b,
+                branchTaken: (isBranch ? branchResult.taken : False)
+            };
+        end
     endmethod
 endmodule

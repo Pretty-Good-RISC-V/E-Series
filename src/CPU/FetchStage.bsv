@@ -34,12 +34,11 @@ module mkFetchStage(FetchStage);
 
         case(state)
             WAITING_FOR_FETCH_REQUEST: begin
-                $display("FetchStage - Fetching instruction at $%0h", programCounter);
                 instructionMemoryRequest.wset(ReadOnlyMemoryRequest {
                     byteen: 'b1111,
                     address: programCounter
                 });
-                $display("FetchStage - Inserting pipeline bubble");
+
                 nextState = WAITING_FOR_FETCH_RESPONSE;
             end
 
@@ -60,10 +59,6 @@ module mkFetchStage(FetchStage);
                     end
 
                     nextState = WAITING_FOR_FETCH_REQUEST;
-                    $display("FetchStage - Memory response found: ", fshow(response));
-                end else begin
-                    $display("FetchStage - Waiting for instruction memory response");
-                    $display("FetchStage - Inserting pipeline bubble");
                 end
             end
         endcase

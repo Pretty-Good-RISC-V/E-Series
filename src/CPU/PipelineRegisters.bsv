@@ -7,17 +7,16 @@ import DefaultValue::*;
 // PipelineRegisterCommon
 //
 typedef struct {
-    Word32 instruction;
-    Word programCounter;
-    Bool isBubble;
-
+    Word32       instruction;
+    Word         programCounter;
+    Bool         isBubble;
     Maybe#(Trap) trap;
 } PipelineRegisterCommon deriving(Bits, Eq, FShow);
 
 instance DefaultValue #(PipelineRegisterCommon);
     defaultValue = PipelineRegisterCommon { 
         instruction: 32'b0000000_00000_00000_000_00000_0110011, // ADD x0, x0, x0
-        programCounter: 'hc0dec0de,
+        programCounter: 'hf000c0de,
         isBubble: True,
         trap: tagged Invalid
     };
@@ -28,12 +27,14 @@ endinstance
 //
 typedef struct {
     PipelineRegisterCommon common;
-    Word nextProgramCounter;
+    Bit#(1)                epoch;
+    Word                   nextProgramCounter;
 } IF_ID deriving(Bits, Eq, FShow);
 
 instance DefaultValue #(IF_ID);
     defaultValue = IF_ID {
         common: defaultValue,
+        epoch: 0,
         nextProgramCounter: 'hbeefbeef
     };
 endinstance
@@ -43,15 +44,17 @@ endinstance
 //
 typedef struct {
     PipelineRegisterCommon common;
-    Word nextProgramCounter;
-    Word a;
-    Word b;
-    Word immediate;
+    Bit#(1)                epoch;
+    Word                   nextProgramCounter;
+    Word                   a;
+    Word                   b;
+    Word                   immediate;
 } ID_EX deriving(Bits, Eq, FShow);
 
 instance DefaultValue #(ID_EX);
     defaultValue = ID_EX {
         common: defaultValue,
+        epoch: 0,
         nextProgramCounter: 'hbeefbeef,
         a: 0,
         b: 0,
@@ -64,9 +67,9 @@ endinstance
 //
 typedef struct {
     PipelineRegisterCommon common;
-    Word aluOutput;
-    Word b;
-    Bool branchTaken;
+    Word                   aluOutput;
+    Word                   b;
+    Bool                   branchTaken;
 } EX_MEM deriving(Bits, Eq, FShow);
 
 instance DefaultValue #(EX_MEM);
@@ -83,8 +86,8 @@ endinstance
 //
 typedef struct {
     PipelineRegisterCommon common;
-    Word aluOutput;
-    Word loadResult;
+    Word                   aluOutput;
+    Word                   loadResult;
 } MEM_WB deriving(Bits, Eq, FShow);
 
 instance DefaultValue #(MEM_WB);

@@ -34,6 +34,7 @@ module mkDecodeStage_tb(Empty);
                 isBubble: False,
                 trap: tagged Invalid
             },
+            epoch: 0,
             nextProgramCounter: 'h8000_0004
         };
 

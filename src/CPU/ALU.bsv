@@ -65,7 +65,6 @@ module mkALU(ALU);
             end     
 `endif   
             default: begin
-                $display("ALU: Illegal ALU operation: $0x", aluOperation);
                 result = 0;
                 illegalOperation = True;
             end

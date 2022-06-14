@@ -27,14 +27,18 @@ endinterface
 module mkCPU#(
     ProgramCounter initialProgramCounter
 )(CPU);
+    // CPU cycle counter
     Reg#(Word)           cycle  <- mkReg(0);
 
-    // Pipeline Registers
+    // Pipeline registers
     Reg#(ProgramCounter) pc     <- mkReg(initialProgramCounter);
     Reg#(IF_ID)          if_id  <- mkReg(defaultValue);
     Reg#(ID_EX)          id_ex  <- mkReg(defaultValue);
     Reg#(EX_MEM)         ex_mem <- mkReg(defaultValue);
     Reg#(MEM_WB)         mem_wb <- mkReg(defaultValue);
+
+    // Pipeline epoch
+    Reg#(Bit#(1))        epoch  <- mkReg(0);
 
     // General purpose register (GPR) file
     GPRFile gprFile <- mkGPRFile;
@@ -81,11 +85,11 @@ module mkCPU#(
         //
         // Forward declarations of intermediate pipeline structures
         //
-        ProgramCounter pc_;
-        IF_ID  if_id_;
-        ID_EX  id_ex_;
-        EX_MEM ex_mem_;
-        MEM_WB mem_wb_;
+        ProgramCounter         pc_;
+        IF_ID                  if_id_;
+        ID_EX                  id_ex_;
+        EX_MEM                 ex_mem_;
+        MEM_WB                 mem_wb_;
         PipelineRegisterCommon wb_out_;
 
         //
@@ -93,29 +97,51 @@ module mkCPU#(
         //
         if_id_  <- fetchStage.fetch(pc, ex_mem);
         id_ex_  <- decodeStage.decode(if_id, gprFile.gprReadPort1, gprFile.gprReadPort2);
-        ex_mem_ <- executeStage.execute(id_ex);
+        ex_mem_ <- executeStage.execute(id_ex, epoch);
         mem_wb_ <- memoryStage.memory(ex_mem);
         wb_out_ <- writebackStage.writeback(mem_wb, gprFile.gprWritePort);
 
         $display("-----------------------------");
-        $display("Cycle : %0d", cycle);
-        $display("PC    : $%0x", pc);
-        $display("IF_ID : ", fshow(if_id_));
-        $display("ID_EX : ", fshow(id_ex_));
-        $display("EX_MEM: ", fshow(ex_mem_));
-        $display("MEM_WB: ", fshow(mem_wb_));
-        $display("WB_OUT: ", fshow(wb_out_));
+        $display("Cycle   : %0d", cycle);
+        if(if_id_.common.isBubble) begin
+            $display("Fetch   : Stalled fetching $%0x", pc);
+        end else begin
+            $display("Fetch   : ", fshow(if_id_));
+        end
+
+        if (id_ex_.common.isBubble) begin
+            $display("Decode  : ** BUBBLE ** ");
+        end else begin
+            $display("Decode  : ", fshow(id_ex_));
+        end
+
+        if (ex_mem_.common.isBubble) begin
+            $display("Execute : ** BUBBLE **");
+        end else begin
+            $display("Execute : ", fshow(ex_mem_));
+        end
+
+        if (mem_wb_.common.isBubble) begin
+            $display("Memory  : ** BUBBLE **");
+        end else begin
+            $display("Memory  : ", fshow(mem_wb_));
+        end
+
+        if (wb_out_.isBubble) begin
+            $display("Result  : ** BUBBLE **");
+        end else begin
+            $display("Result  : ", fshow(wb_out_));
+        end
 
         //
         // Check for traps (and update the program counter to the trap handler if one exists)
         //
         if (wb_out_.trap matches tagged Valid .trap) begin
             pc_ <- csrFile.trapController.beginTrap(trap);
+            $display("TRAP DETECTED: Jumping to $%0x", pc_);
         end else begin
             pc_ = if_id_.nextProgramCounter;
         end
-
-        $display("NEXT_PC: $%0x", pc_);
 
         //
         // If any stage is stalled, all staged *before* that are
@@ -130,7 +156,6 @@ module mkCPU#(
             ex_mem <= ex_mem_;
             mem_wb <= mem_wb_;
         end else if(if_id_.common.isBubble) begin
-            $display("Fetch Stalled");
             if_id  <= if_id_;
             id_ex  <= id_ex_;
             ex_mem <= ex_mem_;
