@@ -12,7 +12,7 @@ typedef struct {
 } ALUTestCase deriving(Bits, Eq, FShow);
 
 (* synthesize *)
-module mkALU_ESeries_tb(Empty);
+module mkALU_tb(Empty);
     Reg#(Word) testNumber <- mkReg(0);
 
 `ifdef RV32

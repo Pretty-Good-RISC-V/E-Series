@@ -45,6 +45,7 @@ module mkCPU_tb(Empty);
         'h0000006f,
         'hfe9ff06f
     };
+    
     //
     // Simulated instruction memory server
     //
