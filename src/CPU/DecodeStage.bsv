@@ -36,7 +36,7 @@ module mkDecodeStage(DecodeStage);
 
             // U-Type
             'b0?10111: begin
-                return {if_id.common.instruction[31:12], 12'b0};
+                return signExtend({if_id.common.instruction[31:12], 12'b0});
             end
 
             // J-Type

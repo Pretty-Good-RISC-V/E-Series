@@ -104,7 +104,7 @@ module mkCPU_tb(Empty);
             let wordIndex = memoryRequest.address >> 2;
             if (wordIndex < instructionCount) begin
                 dataMemoryResponse.wset(FallibleMemoryResponse {
-                    data: programMemory[wordIndex],
+                    data: zeroExtend(programMemory[wordIndex]),
                     denied: False
                 });
             end else begin

@@ -45,7 +45,7 @@ module mkFetchStage_tb(Empty);
             $display("Memory latency expired - responding to memory request: ", fshow(memoryRequest));
 
             memoryResponse.wset(FallibleMemoryResponse {
-                data: memoryRequest.address,
+                data: 0,
                 denied: False
             });
         end
