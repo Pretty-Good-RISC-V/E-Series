@@ -25,6 +25,7 @@ foreach(TEST_FILE ${TEST_FILES})
     target_link_libraries(${TEST_TARGET}
         PGRVCommon::PGRVCommon
         CSRs::CSRs
+        InstructionLogger::InstructionLogger
     )
     add_test(
         NAME ${TEST_TARGET}

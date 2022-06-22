@@ -29,13 +29,13 @@ module mkDecodeStage_tb(Empty);
         $display("Testing...");
         let if_id = IF_ID {
             common: PipelineRegisterCommon {
-                instruction: {7'b0, 5'h1, 5'h2, 3'b0, 5'h3, 7'b0110011 },
-                programCounter: 'h8000_0000,
-                isBubble: False,
-                trap: tagged Invalid
+                ir:         {7'b0, 5'h1, 5'h2, 3'b0, 5'h3, 7'b0110011 },
+                pc:         'h8000_0000,
+                isBubble:   False,
+                trap:       tagged Invalid
             },
-            epoch: 0,
-            nextProgramCounter: 'h8000_0004
+            epoch:  0,
+            npc:    'h8000_0004
         };
 
         let id_ex <- dut.decode(if_id, gprFile.gprReadPort1, gprFile.gprReadPort2);

@@ -27,12 +27,12 @@ module mkMemoryStage(MemoryStage);
 
     method ActionValue#(MEM_WB) memory(EX_MEM ex_mem);
         let mem_wb = MEM_WB {
-            common: ex_mem.common,
-            aluOutput: ex_mem.aluOutput,
-            loadResult: 0
+            common:     ex_mem.common,
+            aluOutput:  ex_mem.aluOutput,
+            lmd:        0
         };
 
-        let opcode          = ex_mem.common.instruction[6:0];
+        let opcode          = ex_mem.common.ir[6:0];
         let isLoadStore     = (opcode matches 'b0?00011 ? True : False);
         let isStore         = unpack(opcode[5]);
 

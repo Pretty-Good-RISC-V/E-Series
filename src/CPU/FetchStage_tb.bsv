@@ -59,7 +59,7 @@ module mkFetchStage_tb(Empty);
     rule test;
         $display("--------------");
         $display("Cycle : %0d", cycle);
-        let if_id <- dut.fetch(programCounter, ex_mem);
+        let if_id <- dut.fetch(programCounter, ex_mem, 0);
         $display("IF_ID : ", fshow(if_id));
 
         if (cycle > 20) begin

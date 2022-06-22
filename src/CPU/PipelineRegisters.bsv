@@ -7,18 +7,18 @@ import DefaultValue::*;
 // PipelineRegisterCommon
 //
 typedef struct {
-    Word32       instruction;
-    Word         programCounter;
+    Word32       ir;
+    Word         pc;
     Bool         isBubble;
     Maybe#(Trap) trap;
 } PipelineRegisterCommon deriving(Bits, Eq, FShow);
 
 instance DefaultValue #(PipelineRegisterCommon);
     defaultValue = PipelineRegisterCommon { 
-        instruction: 32'b0000000_00000_00000_000_00000_0110011, // ADD x0, x0, x0
-        programCounter: 'hf000c0de,
-        isBubble: True,
-        trap: tagged Invalid
+        ir:         32'b0000000_00000_00000_000_00000_0110011, // ADD x0, x0, x0
+        pc:         'hf000c0de,
+        isBubble:   True,
+        trap:       tagged Invalid
     };
 endinstance
 
@@ -28,14 +28,14 @@ endinstance
 typedef struct {
     PipelineRegisterCommon common;
     Bit#(1)                epoch;
-    Word                   nextProgramCounter;
+    Word                   npc;     // Next program counter
 } IF_ID deriving(Bits, Eq, FShow);
 
 instance DefaultValue #(IF_ID);
     defaultValue = IF_ID {
         common: defaultValue,
-        epoch: 0,
-        nextProgramCounter: 'hbeefbeef
+        epoch:  0,
+        npc:    'hbeefbeef
     };
 endinstance
 
@@ -45,20 +45,20 @@ endinstance
 typedef struct {
     PipelineRegisterCommon common;
     Bit#(1)                epoch;
-    Word                   nextProgramCounter;
-    Word                   a;
-    Word                   b;
-    Word                   immediate;
+    Word                   npc;     // Next program counter
+    Word                   a;       // Operand 1
+    Word                   b;       // Operand 2
+    Word                   imm;     // Sign extended immediate
 } ID_EX deriving(Bits, Eq, FShow);
 
 instance DefaultValue #(ID_EX);
     defaultValue = ID_EX {
         common: defaultValue,
-        epoch: 0,
-        nextProgramCounter: 'hbeefbeef,
-        a: 0,
-        b: 0,
-        immediate: 0
+        epoch:  0,
+        npc:    'hbeefbeef,
+        a:      'hAABBCCDD,
+        b:      'hDDCCBBAA,
+        imm:    0
     };
 endinstance
 
@@ -68,16 +68,16 @@ endinstance
 typedef struct {
     PipelineRegisterCommon common;
     Word                   aluOutput;
-    Word                   b;
-    Bool                   branchTaken;
+    Word                   b;           // Operand
+    Bool                   cond;        // Branch taken?
 } EX_MEM deriving(Bits, Eq, FShow);
 
 instance DefaultValue #(EX_MEM);
     defaultValue = EX_MEM {
-        common: defaultValue,
-        aluOutput: 0,
-        b: 0,
-        branchTaken: False
+        common:     defaultValue,
+        aluOutput:  0,
+        b:          'h11223344,
+        cond:       False
     };
 endinstance
 
@@ -87,13 +87,13 @@ endinstance
 typedef struct {
     PipelineRegisterCommon common;
     Word                   aluOutput;
-    Word                   loadResult;
+    Word                   lmd;         // Load result
 } MEM_WB deriving(Bits, Eq, FShow);
 
 instance DefaultValue #(MEM_WB);
     defaultValue = MEM_WB {
-        common: defaultValue,
-        aluOutput: 0,
-        loadResult: 0
+        common:     defaultValue,
+        aluOutput:  0,
+        lmd:        0
     };
 endinstance

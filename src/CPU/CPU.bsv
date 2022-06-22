@@ -56,27 +56,11 @@ module mkCPU#(
     // Retired instruction this cycle if any
     RWire#(RetiredInstruction) retiredInstruction <- mkRWire;
 
-    function Tuple2#(Bool, Bool) instructionHasGPRArguments(Word32 instruction);
-        return case(instruction[6:0])
-            // 'b1100111: return tuple2(True, False);  // JALR
-            // 'b1100011: return tuple2(True, True);   // Branches
-            'b0000011: return tuple2(True, False);  // Loads
-            // 'b0100011: return tuple2(True, True);   // Stores
-            // 'b0010011: return tuple2(True, False);  // ALU immediate
-            // 'b0110011: return tuple2(True, True);   // ALU
-            // 'b0001111: return tuple2(True, False);  // FENCE
-            default:   return tuple2(False, False); // Everything else
-        endcase;
-    endfunction
-
     function Bool detectLoadHazard(IF_ID if_id_, ID_EX id_ex_);
         Bool loadHazard = False;
-        match { .needsRs1, .needsRs2 } = instructionHasGPRArguments(id_ex_.common.instruction);
-
-        if (needsRs1 && id_ex_.common.instruction[11:7] == if_id.common.instruction[19:15]) begin
-            loadHazard = True;
-        end else if (needsRs1 && id_ex_.common.instruction[11:7] == if_id.common.instruction[24:20]) begin
-            loadHazard = True;
+        if (id_ex_.common.ir[6:0] == 'b0000011 &&
+           (id_ex_.common.ir[11:7] == if_id.common.ir[19:15])) begin
+                loadHazard = True;
         end
         return loadHazard;
     endfunction
@@ -95,42 +79,45 @@ module mkCPU#(
         //
         // Process the pipeline
         //
-        if_id_  <- fetchStage.fetch(pc, ex_mem);
+        $display("-----------------------------");
+        $display("Cycle   : %0d", cycle);
+
         id_ex_  <- decodeStage.decode(if_id, gprFile.gprReadPort1, gprFile.gprReadPort2);
-        ex_mem_ <- executeStage.execute(id_ex, epoch);
+        ex_mem_ <- executeStage.execute(id_ex, epoch, toPut(asIfc(epoch)));
+
+        if_id_  <- fetchStage.fetch(pc, ex_mem_, epoch);
+
         mem_wb_ <- memoryStage.memory(ex_mem);
         wb_out_ <- writebackStage.writeback(mem_wb, gprFile.gprWritePort);
 
-        $display("-----------------------------");
-        $display("Cycle   : %0d", cycle);
-        if(if_id_.common.isBubble) begin
+        if(if_id.common.isBubble) begin
             $display("Fetch   : Stalled fetching $%0x", pc);
         end else begin
-            $display("Fetch   : ", fshow(if_id_));
+            $display("Fetch   : $%0x", pc);
         end
 
-        if (id_ex_.common.isBubble) begin
+        if (if_id.common.isBubble) begin
             $display("Decode  : ** BUBBLE ** ");
         end else begin
-            $display("Decode  : ", fshow(id_ex_));
+            $display("Decode  : ", fshow(if_id));
         end
 
-        if (ex_mem_.common.isBubble) begin
+        if (id_ex.common.isBubble) begin
             $display("Execute : ** BUBBLE **");
         end else begin
-            $display("Execute : ", fshow(ex_mem_));
+            $display("Execute : ", fshow(id_ex));
         end
 
-        if (mem_wb_.common.isBubble) begin
+        if (ex_mem.common.isBubble) begin
             $display("Memory  : ** BUBBLE **");
         end else begin
-            $display("Memory  : ", fshow(mem_wb_));
+            $display("Memory  : ", fshow(ex_mem));
         end
 
-        if (wb_out_.isBubble) begin
-            $display("Result  : ** BUBBLE **");
+        if (mem_wb.common.isBubble) begin
+            $display("WriteB  : ** BUBBLE **");
         end else begin
-            $display("Result  : ", fshow(wb_out_));
+            $display("WriteB  : ", fshow(mem_wb));
         end
 
         //
@@ -139,8 +126,9 @@ module mkCPU#(
         if (wb_out_.trap matches tagged Valid .trap) begin
             pc_ <- csrFile.trapController.beginTrap(trap);
             $display("TRAP DETECTED: Jumping to $%0x", pc_);
+            epoch <= ~epoch;
         end else begin
-            pc_ = if_id_.nextProgramCounter;
+            pc_ = if_id_.npc;
         end
 
         //
@@ -183,8 +171,8 @@ module mkCPU#(
             csrFile.incrementInstructionsRetiredCounter;
 
             retiredInstruction.wset(RetiredInstruction {
-                programCounter: wb_out_.programCounter,
-                instruction:    wb_out_.instruction
+                programCounter: wb_out_.pc,
+                instruction:    wb_out_.ir
             });
         end
 

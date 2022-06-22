@@ -1,16 +1,29 @@
 import PGRV::*;
 import CPU::*;
+import InstructionLogger::*;
 import MemoryIO::*;
 
 import Assert::*;
 import ClientServer::*;
 import Connectable::*;
 import FIFO::*;
+import GetPut::*;
 
 (* synthesize *)
 module mkCPU_tb(Empty);
     // Device under test (DUT)
     CPU dut <- mkCPU(0);
+
+    // Instruction Log
+    InstructionLog log <- mkInstructionLog;
+    rule logRetiredInstruction;
+        let maybeRetiredInstruction <- dut.getRetiredInstruction.get;
+        if (maybeRetiredInstruction matches tagged Valid .retiredInstruction) begin
+            log.logInstruction(
+                retiredInstruction.programCounter,
+                retiredInstruction.instruction);
+        end
+    endrule
 
     // Cycle counter
     Reg#(Bit#(XLEN)) cycle <- mkReg(0);    
@@ -33,9 +46,9 @@ module mkCPU_tb(Empty);
     //   14:	0000006f          	j	14 <_pass>
     //
     // 0000000000000018 <_fail>:
-    //   18:	fe9ff06f          	j	0 <_boot>
+    //   18:	fe9ff06f          	j	18 <_boot>
     //
-    let instructionCount = 7;
+    let instructionCount = 12;
     Word32 programMemory[instructionCount] = {
         'h00a00093,
         'h01400113,
@@ -43,7 +56,13 @@ module mkCPU_tb(Empty);
         'h002081b3,
         'h00919463,
         'h0000006f,
-        'hfe9ff06f
+        'hfe9ff06f,
+
+        'hdeadbeef,
+        'hdeadbeef,
+        'hdeadbeef,
+        'hdeadbeef,
+        'hdeadbeef
     };
     
     //
