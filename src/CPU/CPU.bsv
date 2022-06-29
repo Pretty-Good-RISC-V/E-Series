@@ -4,31 +4,52 @@ import DecodeStage::*;
 import ExecuteStage::*;
 import FetchStage::*;
 import GPRFile::*;
+import ISAUtils::*;
 import MemoryIO::*;
 import MemoryStage::*;
 import PipelineRegisters::*;
+import PipelineUtils::*;
 import WritebackStage::*;
 
 import ClientServer::*;
 import GetPut::*;
+import StmtFSM::*;
+
+typedef struct {
+    ProgramCounter pc;
+    IF_ID  if_id;
+    ID_EX  id_ex;
+    EX_MEM ex_mem;
+    MEM_WB mem_wb;
+    PipelineRegisterCommon wb_out;
+} PipelineState deriving(Bits, Eq, FShow);
 
 typedef struct {
     ProgramCounter programCounter;
     Word32 instruction;
 } RetiredInstruction deriving(Bits, Eq, FShow);
 
+typedef enum {
+    RESET,
+    INITIALIZING,
+    READY
+} CPUState deriving(Bits, Eq, FShow);
+
 interface CPU;
+    method Action   step; 
+    method CPUState getState;
+
     interface ReadOnlyMemoryClient#(XLEN, 32)    instructionMemoryClient;
     interface ReadWriteMemoryClient#(XLEN, XLEN) dataMemoryClient;
 
     interface Get#(Maybe#(RetiredInstruction))   getRetiredInstruction;
+    interface Get#(PipelineState)                getPipelineState;
 endinterface
 
 module mkCPU#(
     ProgramCounter initialProgramCounter
 )(CPU);
-    // CPU cycle counter
-    Reg#(Word)           cycle  <- mkReg(0);
+    Reg#(CPUState)       state  <- mkReg(RESET);
 
     // Pipeline registers
     Reg#(ProgramCounter) pc     <- mkReg(initialProgramCounter);
@@ -41,31 +62,71 @@ module mkCPU#(
     Reg#(Bit#(1))        epoch  <- mkReg(0);
 
     // General purpose register (GPR) file
-    GPRFile gprFile <- mkGPRFile;
+    GPRFile              gprFile <- mkGPRFile;
 
     // Constrol and status register (CSR) file
-    CSRFile csrFile <- mkCSRFile;
+    CSRFile              csrFile <- mkCSRFile;
 
     // Pipeline stages
-    FetchStage     fetchStage     <- mkFetchStage;      // Stage 1
-    DecodeStage    decodeStage    <- mkDecodeStage;     // Stage 2
-    ExecuteStage   executeStage   <- mkExecuteStage;    // Stage 3
-    MemoryStage    memoryStage    <- mkMemoryStage;     // Stage 4
-    WritebackStage writebackStage <- mkWritebackStage;  // Stage 5
+    FetchStage           fetchStage     <- mkFetchStage;      // Stage 1
+    DecodeStage          decodeStage    <- mkDecodeStage;     // Stage 2
+    ExecuteStage         executeStage   <- mkExecuteStage;    // Stage 3
+    MemoryStage          memoryStage    <- mkMemoryStage;     // Stage 4
+    WritebackStage       writebackStage <- mkWritebackStage;  // Stage 5
+
+    Reg#(PipelineRegisterCommon) wb_out <- mkReg(defaultValue);
 
     // Retired instruction this cycle if any
     RWire#(RetiredInstruction) retiredInstruction <- mkRWire;
 
-    function Bool detectLoadHazard(IF_ID if_id_, ID_EX id_ex_);
-        Bool loadHazard = False;
-        if (id_ex_.common.ir[6:0] == 'b0000011 &&
-           (id_ex_.common.ir[11:7] == if_id.common.ir[19:15])) begin
-                loadHazard = True;
-        end
-        return loadHazard;
-    endfunction
+    //
+    // Initialization
+    //
+    Reg#(Bit#(10)) gprInitIndex <- mkRegU;
+    Stmt initializationStatements = (seq
+        //
+        // Zero the GPRs
+        //
+        for (gprInitIndex <= 0; gprInitIndex <= 32; gprInitIndex <= gprInitIndex + 1)
+            gprFile.gprWritePort.write(truncate(gprInitIndex), 0);
 
-    rule pipeline;
+        state <= READY;
+    endseq);
+
+    FSM initializationMachine <- mkFSMWithPred(initializationStatements, state == INITIALIZING);
+
+    rule initialization(state == RESET);
+        state <= INITIALIZING;
+        initializationMachine.start;
+    endrule
+
+    interface ReadOnlyMemoryClient  instructionMemoryClient = fetchStage.instructionMemoryClient;
+    interface ReadWriteMemoryClient dataMemoryClient        = memoryStage.dataMemoryClient;
+
+    interface Get getRetiredInstruction;
+        method ActionValue#(Maybe#(RetiredInstruction)) get;
+            return retiredInstruction.wget;
+        endmethod
+    endinterface
+
+    interface Get getPipelineState;
+        method ActionValue#(PipelineState) get;
+            return PipelineState {
+                pc: pc,
+                if_id: if_id,
+                id_ex: id_ex,
+                ex_mem: ex_mem,
+                mem_wb: mem_wb,
+                wb_out: wb_out
+            };
+        endmethod
+    endinterface
+
+    method CPUState getState;
+        return state;
+    endmethod
+
+    method Action step if(state == READY);
         //
         // Forward declarations of intermediate pipeline structures
         //
@@ -79,21 +140,36 @@ module mkCPU#(
         //
         // Process the pipeline
         //
-        $display("-----------------------------");
-        $display("Cycle   : %0d", cycle);
+        ex_mem_ <- executeStage.execute(id_ex, epoch);
+        mem_wb_ <- memoryStage.accessMemory(ex_mem);
 
-        id_ex_  <- decodeStage.decode(if_id, gprFile.gprReadPort1, gprFile.gprReadPort2);
-        ex_mem_ <- executeStage.execute(id_ex, epoch, toPut(asIfc(epoch)));
+        let flipEpoch = False;
+        if (ex_mem_.cond && id_ex.npc != ex_mem_.aluOutput) begin
+            $display("Branch not as prediced...updating epoch");
+            flipEpoch = True;
+        end
 
+
+        //
+        // Determine forwarded operands
+        //
+        // match { .rs1Forward, .rs2Forward } = getForwardedOperands(id_ex, ex_mem_, mem_wb_);
+        let ops <- getForwardedOperands2(id_ex, ex_mem_, mem_wb_);
+        match { .rs1Forward, .rs2Forward } = ops;
+        //
+
+        // $display("Forward EX_MEM_: ", fshow(ex_mem_));
+        // $display("Forward MEM_WB_: ", fshow(mem_wb_));
+        // $display("Forward RS1: ", fshow(rs1Forward));
+        // $display("Forward RS2: ", fshow(rs2Forward));
+        id_ex_  <- decodeStage.decode(if_id, gprFile.gprReadPort1, gprFile.gprReadPort2, rs1Forward, rs2Forward);
         if_id_  <- fetchStage.fetch(pc, ex_mem_, epoch);
-
-        mem_wb_ <- memoryStage.memory(ex_mem);
         wb_out_ <- writebackStage.writeback(mem_wb, gprFile.gprWritePort);
 
         if(if_id.common.isBubble) begin
-            $display("Fetch   : Stalled fetching $%0x", pc);
+            $display("Fetch   : Waiting for $%0x", pc);
         end else begin
-            $display("Fetch   : $%0x", pc);
+            $display("Fetch   : Requesting $%0x", pc);
         end
 
         if (if_id.common.isBubble) begin
@@ -126,9 +202,13 @@ module mkCPU#(
         if (wb_out_.trap matches tagged Valid .trap) begin
             pc_ <- csrFile.trapController.beginTrap(trap);
             $display("TRAP DETECTED: Jumping to $%0x", pc_);
-            epoch <= ~epoch;
+            flipEpoch = True;
         end else begin
-            pc_ = if_id_.npc;
+            pc_ = (ex_mem_.cond ? ex_mem_.aluOutput : if_id_.npc);
+        end
+
+        if (flipEpoch) begin
+            epoch <= ~epoch;
         end
 
         //
@@ -139,15 +219,17 @@ module mkCPU#(
             $display("Memory Stage Stalled");
             mem_wb <= mem_wb;
         end else if(detectLoadHazard(if_id_, id_ex_)) begin
-            $display("Load Hazard");
-            id_ex  <= id_ex_;
+            $display("Load Hazard - inserting bubble into EX");
+            id_ex  <= defaultValue; // Don't issue an instruction - insert bubble
             ex_mem <= ex_mem_;
             mem_wb <= mem_wb_;
+            wb_out <= wb_out_;
         end else if(if_id_.common.isBubble) begin
             if_id  <= if_id_;
             id_ex  <= id_ex_;
             ex_mem <= ex_mem_;
             mem_wb <= mem_wb_;
+            wb_out <= wb_out_;
         end else begin
             $display("No stalls");
             pc     <= pc_;
@@ -155,6 +237,7 @@ module mkCPU#(
             id_ex  <= id_ex_;
             ex_mem <= ex_mem_;
             mem_wb <= mem_wb_;
+            wb_out <= wb_out_;
         end
 
         //
@@ -175,16 +258,5 @@ module mkCPU#(
                 instruction:    wb_out_.ir
             });
         end
-
-        cycle <= cycle + 1;
-    endrule
-
-    interface ReadOnlyMemoryClient  instructionMemoryClient = fetchStage.instructionMemoryClient;
-    interface ReadWriteMemoryClient dataMemoryClient        = memoryStage.dataMemoryClient;
-
-    interface Get getRetiredInstruction;
-        method ActionValue#(Maybe#(RetiredInstruction)) get;
-            return retiredInstruction.wget;
-        endmethod
-    endinterface
+    endmethod
 endmodule

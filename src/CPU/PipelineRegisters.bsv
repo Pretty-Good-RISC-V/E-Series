@@ -56,8 +56,8 @@ instance DefaultValue #(ID_EX);
         common: defaultValue,
         epoch:  0,
         npc:    'hbeefbeef,
-        a:      'hAABBCCDD,
-        b:      'hDDCCBBAA,
+        a:      0,
+        b:      0,
         imm:    0
     };
 endinstance
@@ -68,7 +68,7 @@ endinstance
 typedef struct {
     PipelineRegisterCommon common;
     Word                   aluOutput;
-    Word                   b;           // Operand
+    Word                   b;           // Store value
     Bool                   cond;        // Branch taken?
 } EX_MEM deriving(Bits, Eq, FShow);
 
@@ -76,7 +76,7 @@ instance DefaultValue #(EX_MEM);
     defaultValue = EX_MEM {
         common:     defaultValue,
         aluOutput:  0,
-        b:          'h11223344,
+        b:          0,
         cond:       False
     };
 endinstance

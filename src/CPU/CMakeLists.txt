@@ -14,6 +14,8 @@ target_link_libraries(CPU INTERFACE
 #
 # Tests
 #
+file(COPY assets DESTINATION "${CMAKE_BINARY_DIR}")
+
 file(GLOB TEST_FILES "${CMAKE_CURRENT_SOURCE_DIR}/*_tb.bsv")
 foreach(TEST_FILE ${TEST_FILES})
     get_filename_component(TEST_TARGET ${TEST_FILE} NAME_WE)

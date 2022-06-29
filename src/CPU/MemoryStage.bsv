@@ -8,7 +8,7 @@ import GetPut::*;
 import Memory::*;
 
 interface MemoryStage;
-    method ActionValue#(MEM_WB) memory(EX_MEM ex_mem);
+    method ActionValue#(MEM_WB) accessMemory(EX_MEM ex_mem);
     method Bool isStalled;
 
     interface ReadWriteMemoryClient#(XLEN, XLEN) dataMemoryClient;
@@ -25,7 +25,7 @@ module mkMemoryStage(MemoryStage);
     Reg#(MemoryStageState)                      state              <- mkReg(WAITING_FOR_MEMORY_REQUEST);
     Reg#(Maybe#(FallibleMemoryResponse#(XLEN))) memoryResponse     <- mkReg(tagged Invalid);
 
-    method ActionValue#(MEM_WB) memory(EX_MEM ex_mem);
+    method ActionValue#(MEM_WB) accessMemory(EX_MEM ex_mem);
         let mem_wb = MEM_WB {
             common:     ex_mem.common,
             aluOutput:  ex_mem.aluOutput,

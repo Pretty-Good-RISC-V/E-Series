@@ -16,7 +16,7 @@ module mkWritebackStage(WritebackStage);
                 return tuple2(rd_, mem_wb.lmd);
             end
             'b0?10011: begin    // ALU
-                return tuple2(rd_, mem_wb.lmd);
+                return tuple2(rd_, mem_wb.aluOutput);
             end
             'b1100111: begin    // JALR
                 return tuple2(rd_, mem_wb.aluOutput);
@@ -26,6 +26,7 @@ module mkWritebackStage(WritebackStage);
             end
         endcase;
 
+        $display("WB: Writing $%0x -> x%0d", value, rd);
         gprWritePort.write(rd, value);
 
         return mem_wb.common;

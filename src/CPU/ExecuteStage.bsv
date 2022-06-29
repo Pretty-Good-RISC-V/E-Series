@@ -7,7 +7,7 @@ import Trap::*;
 import GetPut::*;
 
 interface ExecuteStage;
-    method ActionValue#(EX_MEM) execute(ID_EX id_ex, Bit#(1) epoch, Put#(Bit#(1)) putNewEpoch);
+    method ActionValue#(EX_MEM) execute(ID_EX id_ex, Bit#(1) epoch);
 endinterface
 
 module mkExecuteStage(ExecuteStage);
@@ -22,7 +22,7 @@ module mkExecuteStage(ExecuteStage);
         end
     endfunction
 
-    method ActionValue#(EX_MEM) execute(ID_EX id_ex, Bit#(1) epoch, Put#(Bit#(1)) putNewEpoch);
+    method ActionValue#(EX_MEM) execute(ID_EX id_ex, Bit#(1) epoch);
         let func7  = id_ex.common.ir[31:25];
         let func3  = id_ex.common.ir[14:12];
         let opcode = id_ex.common.ir[6:0];
@@ -34,19 +34,19 @@ module mkExecuteStage(ExecuteStage);
 
         // ALU
         let isALU           = (opcode matches 'b0?10011 ? True : False);
-        let aluIsImmediate  = opcode[5];
+        let aluIsImmediate  = ~opcode[5];
         let aluOperation    = {1'b0, func7, func3};
         let aluResult      <- alu.calculate(aluOperation, id_ex.a, (unpack(aluIsImmediate) ? id_ex.imm : id_ex.b));
         if (isALU) begin
-            $display("EXECUTE: ALU");
+            $display("EXECUTE: ALU - A: $%0x, B: $%0x", id_ex.a, (unpack(aluIsImmediate) ? id_ex.imm : id_ex.b));
         end
 
         // Branching
         let isBranch        = (opcode == 'b1100011);
         let branchResult   <- bru.isTaken(func3, id_ex.a, id_ex.b);
-        let branchTarget    = unpack(id_ex.npc) + signedImmediate;
+        let branchTarget    = unpack(id_ex.common.pc) + signedImmediate;
         if (isBranch) begin
-            $display("EXECUTE: BRANCH - A: $%0x, B: $%08x", id_ex.a, id_ex.b);
+            $display("EXECUTE: BRANCH - A: $%0x, B: $%0x", id_ex.a, id_ex.b);
             $display("EXECUTE: BRANCH RESULT: ", fshow(branchResult));
         end
 
@@ -101,7 +101,7 @@ module mkExecuteStage(ExecuteStage);
 
             let aluOutput = (isALU    ? aluResult.result : 
                             (isBranch ? pack(branchTarget) : 
-                            (isJump   ? jumpLink : 
+                            (isJump   ? pack(jumpTarget) : 
                             pack(loadStoreTarget))));
 
             let branchTaken = (isIllegal      ? False :
@@ -109,6 +109,7 @@ module mkExecuteStage(ExecuteStage);
                               (isJump         ? True :
                               (isJumpRelative ? True :
                               False))));
+
             return EX_MEM {
                 common: PipelineRegisterCommon {
                     ir:         id_ex.common.ir,
