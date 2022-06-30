@@ -3,11 +3,11 @@ import PipelineRegisters::*;
 import GPRFile::*;
 
 interface DecodeStage;
-    method ActionValue#(ID_EX) decode(IF_ID if_id, GPRReadPort gprReadPort1, GPRReadPort gprReadPort2, Maybe#(Word) rs1Forward, Maybe#(Word) rs2Forward);
+    method ActionValue#(ID_EX) decode(IF_ID if_id, GPRReadPort gprReadPort1, GPRReadPort gprReadPort2);
 endinterface
 
 module mkDecodeStage(DecodeStage);
-    method ActionValue#(ID_EX) decode(IF_ID if_id, GPRReadPort gprReadPort1, GPRReadPort gprReadPort2, Maybe#(Word) rs1Forward, Maybe#(Word) rs2Forward);
+    method ActionValue#(ID_EX) decode(IF_ID if_id, GPRReadPort gprReadPort1, GPRReadPort gprReadPort2);
         // Instruction field extraction
         let rs2    = if_id.common.ir[24:20];
         let rs1    = if_id.common.ir[19:15];
@@ -60,16 +60,8 @@ module mkDecodeStage(DecodeStage);
         endcase;
 
         // Read GPR registers
-        let gpr1 = gprReadPort1.read(rs1);
-        let gpr2 = gprReadPort2.read(rs2);
-        // $display("Decode - RS1: x%0d = $%0x", rs1, gpr1);
-        // $display("Decode - RS2: x%0d = $%0x", rs2, gpr2);
-
-        let a = fromMaybe(gpr1, rs1Forward);
-        let b = fromMaybe(gpr2, rs2Forward);
-
-        // $display("Decode - RS1: x%0d = $%0x", rs1, a);
-        // $display("Decode - RS2: x%0d = $%0x", rs2, b);
+        let a = gprReadPort1.read(rs1);
+        let b = gprReadPort2.read(rs2);
 
         return ID_EX {
             common: if_id.common,

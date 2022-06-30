@@ -2,12 +2,14 @@ import PGRV::*;
 import GPRFile::*;
 import PipelineRegisters::*;
 
+`undef ENABLE_SPEW
+
 interface WritebackStage;
-    method ActionValue#(PipelineRegisterCommon) writeback(MEM_WB mem_wb, GPRWritePort gprWritePort);
+    method ActionValue#(WB_OUT) writeback(MEM_WB mem_wb, GPRWritePort gprWritePort);
 endinterface
 
 module mkWritebackStage(WritebackStage);
-    method ActionValue#(PipelineRegisterCommon) writeback(MEM_WB mem_wb, GPRWritePort gprWritePort);
+    method ActionValue#(WB_OUT) writeback(MEM_WB mem_wb, GPRWritePort gprWritePort);
         let opcode = mem_wb.common.ir[6:0];
         let rd_    = mem_wb.common.ir[11:7];
 
@@ -26,9 +28,14 @@ module mkWritebackStage(WritebackStage);
             end
         endcase;
 
+`ifdef ENABLE_SPEW
         $display("WB: Writing $%0x -> x%0d", value, rd);
+`endif
         gprWritePort.write(rd, value);
 
-        return mem_wb.common;
+        return WB_OUT {
+            common: mem_wb.common,
+            writebackValue: value
+        };
     endmethod
 endmodule

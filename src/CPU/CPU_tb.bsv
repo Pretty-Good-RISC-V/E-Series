@@ -26,9 +26,6 @@ module mkSimpleIMemorySystem#(Word programMemory[], Word instructionCount)(Simpl
     interface ReadOnlyMemoryServer instructionMemoryServer;
         interface Put request;
             method Action put(ReadOnlyMemoryRequest#(XLEN, 32) memoryRequest);
-                $display("Cycle        : %0d", cycleNumber);
-                $display("IMEM received: ", fshow(memoryRequest));
-
                 let wordIndex = memoryRequest.address >> 2;
                 if (wordIndex < instructionCount) begin
                     memoryResponse.wset(FallibleMemoryResponse {
@@ -82,7 +79,7 @@ module mkCPU_tb(Empty);
     //   14:	0000006f          	j	14 <_pass>
     //
     // 0000000000000018 <_fail>:
-    //   18:	fe9ff06f          	j	18 <_boot>
+    //   18:	0000006f          	j	18 <_fail>
     //
     let instructionCount = 12;
     Word32 programMemory[instructionCount] = {
@@ -92,7 +89,7 @@ module mkCPU_tb(Empty);
         'h002081b3,
         'h00919463,
         'h0000006f,
-        'hfe9ff06f,
+        'h0000006f,
 
         'hdeadbeef,
         'hdeadbeef,
@@ -180,10 +177,6 @@ module mkCPU_tb(Empty);
         $display("-----------------------------");
         $display("Cycle   : %0d", cycle);
 
-        let pipelineState <- dut.getPipelineState.get;
-
-        $display("Testing cycle %0d", cycle);
-        $display("Pipeline State: ", fshow(pipelineState));
         // $display("Expected State: ", fshow(pipelineStates[cycle]));
         // dynamicAssert(pipelineState == pipelineStates[cycle], "Pipeline state mismatch");
 

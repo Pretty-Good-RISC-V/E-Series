@@ -15,13 +15,15 @@ import ClientServer::*;
 import GetPut::*;
 import StmtFSM::*;
 
+`undef ENABLE_SPEW
+
 typedef struct {
     ProgramCounter pc;
     IF_ID  if_id;
     ID_EX  id_ex;
     EX_MEM ex_mem;
     MEM_WB mem_wb;
-    PipelineRegisterCommon wb_out;
+    WB_OUT wb_out;
 } PipelineState deriving(Bits, Eq, FShow);
 
 typedef struct {
@@ -57,6 +59,7 @@ module mkCPU#(
     Reg#(ID_EX)          id_ex  <- mkReg(defaultValue);
     Reg#(EX_MEM)         ex_mem <- mkReg(defaultValue);
     Reg#(MEM_WB)         mem_wb <- mkReg(defaultValue);
+    Reg#(WB_OUT)         wb_out <- mkReg(defaultValue);
 
     // Pipeline epoch
     Reg#(Bit#(1))        epoch  <- mkReg(0);
@@ -73,8 +76,6 @@ module mkCPU#(
     ExecuteStage         executeStage   <- mkExecuteStage;    // Stage 3
     MemoryStage          memoryStage    <- mkMemoryStage;     // Stage 4
     WritebackStage       writebackStage <- mkWritebackStage;  // Stage 5
-
-    Reg#(PipelineRegisterCommon) wb_out <- mkReg(defaultValue);
 
     // Retired instruction this cycle if any
     RWire#(RetiredInstruction) retiredInstruction <- mkRWire;
@@ -130,40 +131,43 @@ module mkCPU#(
         //
         // Forward declarations of intermediate pipeline structures
         //
-        ProgramCounter         pc_;
-        IF_ID                  if_id_;
-        ID_EX                  id_ex_;
-        EX_MEM                 ex_mem_;
-        MEM_WB                 mem_wb_;
-        PipelineRegisterCommon wb_out_;
-
-        //
-        // Process the pipeline
-        //
-        ex_mem_ <- executeStage.execute(id_ex, epoch);
-        mem_wb_ <- memoryStage.accessMemory(ex_mem);
-
-        let flipEpoch = False;
-        if (ex_mem_.cond && id_ex.npc != ex_mem_.aluOutput) begin
-            $display("Branch not as prediced...updating epoch");
-            flipEpoch = True;
-        end
-
+        ProgramCounter  pc_;
+        IF_ID           if_id_;
+        ID_EX           id_ex_;
+        EX_MEM          ex_mem_;
+        MEM_WB          mem_wb_;
+        WB_OUT          wb_out_;
 
         //
         // Determine forwarded operands
         //
         // match { .rs1Forward, .rs2Forward } = getForwardedOperands(id_ex, ex_mem_, mem_wb_);
-        let ops <- getForwardedOperands2(id_ex, ex_mem_, mem_wb_);
+        let ops <- getForwardedOperands2(id_ex, ex_mem, mem_wb, wb_out);
         match { .rs1Forward, .rs2Forward } = ops;
+
+        //
+        // Process the pipeline
+        //
+        ex_mem_ <- executeStage.execute(id_ex, rs1Forward, rs2Forward, epoch);
+        mem_wb_ <- memoryStage.accessMemory(ex_mem);
+
+        let flipEpoch = False;
+        if (ex_mem_.cond && id_ex.npc != ex_mem_.aluOutput) begin
+`ifdef ENABLE_SPEW
+            $display("Branch not as prediced...updating epoch");
+`endif
+            flipEpoch = True;
+        end
+
         //
 
         // $display("Forward EX_MEM_: ", fshow(ex_mem_));
         // $display("Forward MEM_WB_: ", fshow(mem_wb_));
         // $display("Forward RS1: ", fshow(rs1Forward));
         // $display("Forward RS2: ", fshow(rs2Forward));
-        id_ex_  <- decodeStage.decode(if_id, gprFile.gprReadPort1, gprFile.gprReadPort2, rs1Forward, rs2Forward);
         if_id_  <- fetchStage.fetch(pc, ex_mem_, epoch);
+        id_ex_  <- decodeStage.decode(if_id, gprFile.gprReadPort1, gprFile.gprReadPort2);
+
         wb_out_ <- writebackStage.writeback(mem_wb, gprFile.gprWritePort);
 
         if(if_id.common.isBubble) begin
@@ -199,7 +203,7 @@ module mkCPU#(
         //
         // Check for traps (and update the program counter to the trap handler if one exists)
         //
-        if (wb_out_.trap matches tagged Valid .trap) begin
+        if (wb_out_.common.trap matches tagged Valid .trap) begin
             pc_ <- csrFile.trapController.beginTrap(trap);
             $display("TRAP DETECTED: Jumping to $%0x", pc_);
             flipEpoch = True;
@@ -216,10 +220,14 @@ module mkCPU#(
         // also stalled
         //
         if (memoryStage.isStalled) begin
+`ifdef ENABLE_SPEW
             $display("Memory Stage Stalled");
+`endif
             mem_wb <= mem_wb;
         end else if(detectLoadHazard(if_id_, id_ex_)) begin
+`ifdef ENABLE_SPEW
             $display("Load Hazard - inserting bubble into EX");
+`endif
             id_ex  <= defaultValue; // Don't issue an instruction - insert bubble
             ex_mem <= ex_mem_;
             mem_wb <= mem_wb_;
@@ -231,7 +239,6 @@ module mkCPU#(
             mem_wb <= mem_wb_;
             wb_out <= wb_out_;
         end else begin
-            $display("No stalls");
             pc     <= pc_;
             if_id  <= if_id_;
             id_ex  <= id_ex_;
@@ -250,12 +257,12 @@ module mkCPU#(
         // of the retired instruction (this is assuming the
         // instruction wasn't a pipeline bubble)
         //
-        if (!wb_out_.isBubble) begin
+        if (!wb_out_.common.isBubble) begin
             csrFile.incrementInstructionsRetiredCounter;
 
             retiredInstruction.wset(RetiredInstruction {
-                programCounter: wb_out_.pc,
-                instruction:    wb_out_.ir
+                programCounter: wb_out_.common.pc,
+                instruction:    wb_out_.common.ir
             });
         end
     endmethod

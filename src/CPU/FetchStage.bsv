@@ -11,6 +11,8 @@ import FIFO::*;
 import GetPut::*;
 import SpecialFIFOs::*;
 
+`undef ENABLE_SPEW
+
 typedef enum {
     WAITING_FOR_FETCH_REQUEST,  // IDLE
     WAITING_FOR_FETCH_RESPONSE
@@ -52,13 +54,17 @@ module mkFetchStage(FetchStage);
             end
 
             WAITING_FOR_FETCH_RESPONSE: begin
+`ifdef ENABLE_SPEW
                 $display("Looking for response...");
+`endif
                 if (instructionMemoryResponse.wget matches tagged Valid .response) begin
                     let npc = (ex_mem.cond ? ex_mem.aluOutput : pc + 4);
 
+`ifdef ENABLE_SPEW
                     if (ex_mem.cond) begin
                         $display("FETCH: Redirected PC to $%0x", npc);
                     end
+`endif
 
                     if_id.common.ir         = response.data;
                     if_id.common.pc         = pc;
@@ -73,10 +79,12 @@ module mkFetchStage(FetchStage);
                         };
                     end
 
+`ifdef ENABLE_SPEW
                     $display("FETCH: Found response...");
 
-                    // Fetch the next instruction
                     $display("FETCH: Fetching instruction for $%0x.", npc);
+`endif
+                    // Fetch the next instruction
                     instructionMemoryRequest.wset(ReadOnlyMemoryRequest {
                         byteen: 'b1111,
                         address: npc
@@ -93,13 +101,5 @@ module mkFetchStage(FetchStage);
         return (state == WAITING_FOR_FETCH_RESPONSE);
     endmethod
 
-    // interface ReadOnlyMemoryClient instructionMemoryClient;
-    //     interface Get request = toGet(instructionMemoryRequests);
-    //     interface Put response;
-    //         method Action put(FallibleMemoryResponse#(32) response);
-    //             instructionMemoryResponse.wset(response);
-    //         endmethod
-    //     endinterface
-    // endinterface // = toGPClient(instructionMemoryRequests, instructionMemoryResponses);
     interface ReadOnlyMemoryClient instructionMemoryClient = toGPClient(instructionMemoryRequest, instructionMemoryResponses);
 endmodule

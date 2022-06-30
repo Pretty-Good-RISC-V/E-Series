@@ -97,3 +97,18 @@ instance DefaultValue #(MEM_WB);
         lmd:        0
     };
 endinstance
+
+//
+// WB_OUT
+//
+typedef struct {
+    PipelineRegisterCommon common;
+    Word writebackValue;                // Value written to register file
+} WB_OUT deriving(Bits, Eq, FShow);
+
+instance DefaultValue#(WB_OUT);
+    defaultValue = WB_OUT {
+        common:     defaultValue,
+        writebackValue: 0
+    };
+endinstance
