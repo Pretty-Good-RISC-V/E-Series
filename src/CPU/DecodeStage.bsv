@@ -15,6 +15,10 @@ module mkDecodeStage(DecodeStage);
 
         // Determine immediate value stored in the instruction
         Word imm = case(opcode) matches
+            // SYSTEM
+            // NOTE: SYSTEM - CSR (unsigned) immediates are stored in the RS1 bits.
+            'b1110011: return zeroExtend(rs1);
+
             // S-Type
             'b0100011: begin
                 return signExtend({

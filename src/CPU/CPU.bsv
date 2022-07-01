@@ -1,4 +1,6 @@
 import PGRV::*;
+
+import BranchPrediction::*;
 import CSRFile::*;
 import DecodeStage::*;
 import ExecuteStage::*;
@@ -53,6 +55,8 @@ module mkCPU#(
 )(CPU);
     Reg#(CPUState)       state  <- mkReg(RESET);
 
+    BranchPredictor      bp     <- mkSimpleBranchPredictor;
+
     // Pipeline registers
     Reg#(ProgramCounter) pc     <- mkReg(initialProgramCounter);
     Reg#(IF_ID)          if_id  <- mkReg(defaultValue);
@@ -71,7 +75,7 @@ module mkCPU#(
     CSRFile              csrFile <- mkCSRFile;
 
     // Pipeline stages
-    FetchStage           fetchStage     <- mkFetchStage;      // Stage 1
+    FetchStage           fetchStage     <- mkFetchStage(bp);  // Stage 1
     DecodeStage          decodeStage    <- mkDecodeStage;     // Stage 2
     ExecuteStage         executeStage   <- mkExecuteStage;    // Stage 3
     MemoryStage          memoryStage    <- mkMemoryStage;     // Stage 4
@@ -185,7 +189,11 @@ module mkCPU#(
         if (id_ex.common.isBubble) begin
             $display("Execute : ** BUBBLE **");
         end else begin
-            $display("Execute : ", fshow(id_ex));
+            if (id_ex.epoch != epoch) begin
+                $display("Execute : *STALE* ", fshow(id_ex));
+            end else begin
+                $display("Execute : ", fshow(id_ex));
+            end
         end
 
         if (ex_mem.common.isBubble) begin

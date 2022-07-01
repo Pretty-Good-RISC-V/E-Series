@@ -23,6 +23,7 @@ foreach(TEST_FILE ${TEST_FILES})
     set_target_properties(${TEST_TARGET} PROPERTIES LINKER_LANGUAGE BSV)
     target_compile_definitions(${TEST_TARGET} PUBLIC
         ${BASE_ISA}
+        ${EXT_C}
     )
     target_link_libraries(${TEST_TARGET}
         PGRVCommon::PGRVCommon

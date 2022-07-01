@@ -1,4 +1,5 @@
 import PGRV::*;
+import BranchPrediction::*;
 import FetchStage::*;
 import MemoryIO::*;
 import PipelineRegisters::*;
@@ -13,7 +14,8 @@ import GetPut::*;
 (* synthesize *)
 module mkFetchStage_tb(Empty);
     // Device under test (DUT)
-    FetchStage dut <- mkFetchStage;
+    BranchPredictor bp <- mkSimpleBranchPredictor;
+    FetchStage     dut <- mkFetchStage(bp);
 
     // Cycle counter
     Reg#(Bit#(XLEN)) cycle    <- mkReg(0);    

@@ -23,7 +23,7 @@
         }
       },
       {
-        "name": "E100_32",
+        "name": "E100_32I",
         "displayName": "E100 (RV32I)",
         "inherits": "base",
         "cacheVariables": {
@@ -34,7 +34,22 @@
         }
       },
       {
-        "name": "E100_64",
+        "name": "E100_32IC",
+        "displayName": "E100 (RV32IC)",
+        "inherits": "base",
+        "cacheVariables": {
+          "BASE_ISA": {
+            "type": "STRING",
+            "value": "RV32"
+          },
+          "EXT_C": {
+            "type": "STRING",
+            "value": "EXT_C"
+          }
+        }
+      },
+      {
+        "name": "E100E_64",
         "displayName": "E100 (RV64I)",
         "inherits": "base",
         "cacheVariables": {
@@ -43,6 +58,21 @@
             "value": "RV64"
           }
         }
+      },
+      {
+        "name": "E100_64IC",
+        "displayName": "E100 (RV64IC)",
+        "inherits": "base",
+        "cacheVariables": {
+          "BASE_ISA": {
+            "type": "STRING",
+            "value": "RV64"
+          },
+          "EXT_C": {
+            "type": "STRING",
+            "value": "EXT_C"
+          }
+       }
       }
     ],
     "buildPresets": [

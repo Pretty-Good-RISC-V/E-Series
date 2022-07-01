@@ -39,98 +39,132 @@ module mkExecuteStage(ExecuteStage);
         $display("EXECUTE: Opcode: b%0b", opcode);
 `endif
 
-        // ALU
-        let isALU           = (opcode matches 'b0?10011 ? True : False);
-        let aluIsImmediate  = ~opcode[5];
-        let aluOperation    = {1'b0, func7, func3};
-        let aluResult      <- alu.calculate(aluOperation, a, (unpack(aluIsImmediate) ? id_ex.imm : b));
+        Word aluOutput = ?;
+        Bool cond      = False;
 
-`ifdef ENABLE_SPEW
-        if (isALU) begin
-            $display("EXECUTE: ALU - A: $%0x, B: $%0x", a, (unpack(aluIsImmediate) ? id_ex.imm : b));
-        end
-`endif
-        // Branching
-        let isBranch        = (opcode == 'b1100011);
-        let branchResult   <- bru.isTaken(func3, a, b);
-        let branchTarget    = unpack(id_ex.common.pc) + signedImmediate;
+        let aluOperation     = {1'b0, func7, func3};
+        let branchTaken      = False;
+        let illegalOperation = True;
 
-`ifdef ENABLE_SPEW
-        if (isBranch) begin
-            $display("EXECUTE: BRANCH - A: $%0x, B: $%0x", a, b);
-            $display("EXECUTE: BRANCH RESULT: ", fshow(branchResult));
-        end
-`endif
-
-        // Jumping
-        let isJump          = (opcode == 'b1101111);                 // JAL
-        let isJumpRelative  = (opcode == 'b1100111) && (func3 == 0); // JALR
-        let jumpTarget      = (isJumpRelative ? ((unpack(a) + signedImmediate) & ~1) : unpack(id_ex.common.pc) + signedImmediate);
-        let jumpLink        = unpack(id_ex.common.pc) + 4;
-
-`ifdef ENABLE_SPEW
-        if (isJump) begin
-            $display("EXECUTE: JAL ($%0x)", jumpTarget);
-        end
-
-        if (isJumpRelative) begin
-            $display("EXECUTE: JALR ($%0x)", jumpTarget);
-        end
-`endif
-
-        // Load/Store
-        let isLoadStore     = (opcode matches 'b0?00011 ? True : False);
-        let isStore         = unpack(opcode[5]);
-        let loadStoreValid  = isLoadStoreValid(func3, isStore);
-        let loadStoreTarget = unpack(a) + signedImmediate;
-
-`ifdef ENABLE_SPEW
-        if (isLoadStore) begin
-            if (isStore) begin
-                $display("EXECUTE: STORE");
-            end else begin
-                $display("EXECUTE: LOAD");
-            end
-        end
-`endif
-
-        let isUnknownOpcode = !(isALU || isBranch || isJump || isJumpRelative || isLoadStore);
-        let isIllegal       = (isALU && aluResult.illegalOperation) ||
-                              (isBranch && branchResult.illegalOperation) ||
-                              (isLoadStore && !loadStoreValid) ||
-                              isUnknownOpcode;
-
-`ifdef ENABLE_SPEW
-        $display("EXECUTE: Unknown Opcode: ", fshow(isUnknownOpcode));
-        $display("EXECUTE: Illegal Opcode: ", fshow(isIllegal));
-`endif
-
+        // Check if instruction epoch matches the pipline epoch.  If not,
+        // the instruction stream for this instruction is stale.
         if (id_ex.epoch != epoch) begin
-`ifdef ENABLE_SPEW
-            $display("Execute stage epoch mismatch - inserting bubble");
-`endif
+            // Instruction stream is stale, return bubble.
             return defaultValue;
         end else begin
-            // If an exception is passed in, forward it - otherwise indicate if
-            // the current instruction is illegal.
+            // Check for a trap in the incoming instruction.  If one does
+            // *not* exist, execute the instruction.
             Maybe#(Trap) trap = id_ex.common.trap;
-            if (!isValid(trap)) begin
-                trap = (isIllegal ? tagged Valid Trap {
-                    cause: exception_ILLEGAL_INSTRUCTION,
-                    isInterrupt: False
-                } : tagged Invalid);
+            if (isValid(trap) == False) begin
+
+                // Execute the instruction
+                case(id_ex.common.ir) matches
+                    // ALU
+                    'b????????????_?????_???_?????_0?10011: begin
+                        let aluIsImmediate  = ~opcode[5];
+                        let aluResult      <- alu.calculate(aluOperation, a, (unpack(aluIsImmediate) ? id_ex.imm : b));
+
+`ifdef ENABLE_SPEW
+                        $display("EXECUTE: ALU - A: $%0x, B: $%0x", a, (unpack(aluIsImmediate) ? id_ex.imm : b));
+`endif
+
+                        aluOutput           = aluResult.result;
+                        illegalOperation    = aluResult.illegalOperation;
+                    end
+
+                    // Branch
+                    'b????????????_?????_???_?????_1100011: begin
+                        let branchTarget    = unpack(id_ex.common.pc) + signedImmediate;
+                        let branchResult   <- bru.isTaken(func3, a, b);
+
+`ifdef ENABLE_SPEW
+                        $display("EXECUTE: BRANCH - A: $%0x, B: $%0x", a, b);
+                        $display("EXECUTE: BRANCH RESULT: ", fshow(branchResult));
+`endif
+
+                        aluOutput           = pack(branchTarget);
+                        branchTaken         = branchResult.taken;
+                        illegalOperation    = branchResult.illegalOperation;
+                    end
+
+                    // Jumps
+                    'b????????????_?????_???_?????_110?111: begin
+                        let isJumpRelative  = (opcode == 'b1100111) && (func3 == 0); // JALR
+                        let jumpTarget      = (isJumpRelative ? ((unpack(a) + signedImmediate) & ~1) : unpack(id_ex.common.pc) + signedImmediate);
+                        let jumpLink        = unpack(id_ex.common.pc) + 4;
+
+`ifdef ENABLE_SPEW
+                        if (isJumpRelative) begin
+                            $display("EXECUTE: JALR ($%0x)", jumpTarget);
+                        end else begin
+                            $display("EXECUTE: JAL ($%0x)", jumpTarget);
+                        end
+`endif
+
+                        aluOutput           = pack(jumpTarget);
+                        branchTaken         = True;
+                        illegalOperation    = False;
+                    end
+
+                    // Load/Store
+                    'b????????????_?????_???_?????_0?00011: begin
+                        let isStore         = unpack(opcode[5]);
+                        let loadStoreValid  = isLoadStoreValid(func3, isStore);
+                        let loadStoreTarget = unpack(a) + signedImmediate;
+
+`ifdef ENABLE_SPEW
+                        if (isStore) begin
+                            $display("EXECUTE: STORE");
+                        end else begin
+                            $display("EXECUTE: LOAD");
+                        end
+`endif
+
+                        aluOutput           = pack(loadStoreTarget);
+                        illegalOperation    = !loadStoreValid;
+                    end
+
+                    // System (ECALL)
+                    'b000000000000_00000_000_00000_1110011: begin
+                        trap = tagged Valid Trap {
+                            // NOTE: for ECALL, the code specified below is for M mode -
+                            //       the handling of the exception will translate it
+                            //       to the call proper for the mode of the processor.
+                            cause: (exception_ENVIRONMENT_CALL_FROM_M_MODE),
+                            isInterrupt: False
+                        };
+                        illegalOperation    = False;
+                    end
+
+                    // System (EBREAK)
+                    'b000000000001_00000_000_00000_1110011: begin
+                        trap = tagged Valid Trap {
+                            cause: exception_BREAKPOINT,
+                            isInterrupt: False
+                        };                
+                    end
+
+                    // System (CSRRW/CSRRWI)
+                    'b????????????_?????_?01_?????_1110011: begin
+                    end
+
+                    // System (CSRRS/CSRRSI)
+                    'b????????????_?????_?10_?????_1110011: begin
+                    end
+
+                    // System (CSRRC/CSRRCI)
+                    'b????????????_?????_?11_?????_1110011: begin
+                    end
+
+                endcase
+
+                if (illegalOperation) begin
+                    trap = tagged Valid Trap {
+                        cause: exception_ILLEGAL_INSTRUCTION,
+                        isInterrupt: False
+                    };               
+                end
             end
-
-            let aluOutput = (isALU    ? aluResult.result : 
-                            (isBranch ? pack(branchTarget) : 
-                            (isJump   ? pack(jumpTarget) : 
-                            pack(loadStoreTarget))));
-
-            let branchTaken = (isIllegal      ? False :
-                              (isBranch       ? branchResult.taken : 
-                              (isJump         ? True :
-                              (isJumpRelative ? True :
-                              False))));
 
             return EX_MEM {
                 common: PipelineRegisterCommon {

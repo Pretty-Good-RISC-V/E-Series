@@ -1,5 +1,6 @@
 import PGRV::*;
 
+import BranchPrediction::*;
 import MemoryIO::*;
 import PipelineRegisters::*;
 import Trap::*;
@@ -25,7 +26,7 @@ interface FetchStage;
     interface ReadOnlyMemoryClient#(XLEN, 32) instructionMemoryClient;
 endinterface
 
-module mkFetchStage(FetchStage);
+module mkFetchStage#(BranchPredictor branchPredictor)(FetchStage);
     RWire#(ReadOnlyMemoryRequest#(XLEN, 32)) instructionMemoryRequest    <- mkRWire;
     FIFO#(FallibleMemoryResponse#(32))       instructionMemoryResponses  <- mkFIFO;
     RWire#(FallibleMemoryResponse#(32))      instructionMemoryResponse   <- mkRWire;
@@ -58,8 +59,6 @@ module mkFetchStage(FetchStage);
                 $display("Looking for response...");
 `endif
                 if (instructionMemoryResponse.wget matches tagged Valid .response) begin
-                    let npc = (ex_mem.cond ? ex_mem.aluOutput : pc + 4);
-
 `ifdef ENABLE_SPEW
                     if (ex_mem.cond) begin
                         $display("FETCH: Redirected PC to $%0x", npc);
@@ -69,6 +68,9 @@ module mkFetchStage(FetchStage);
                     if_id.common.ir         = response.data;
                     if_id.common.pc         = pc;
                     if_id.common.isBubble   = False;
+
+                    let npc = (ex_mem.cond ? ex_mem.aluOutput : branchPredictor.nextProgramCounter(if_id.common));
+
                     if_id.epoch             = epoch;
                     if_id.npc               = npc;
 
