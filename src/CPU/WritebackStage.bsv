@@ -1,41 +1,49 @@
 import PGRV::*;
+import CSRFile::*;
 import GPRFile::*;
 import PipelineRegisters::*;
 
 `undef ENABLE_SPEW
 
 interface WritebackStage;
-    method ActionValue#(WB_OUT) writeback(MEM_WB mem_wb, GPRWritePort gprWritePort);
+    method ActionValue#(WB_OUT) writeback(MEM_WB mem_wb, GPRWritePort gprWritePort, CSRWritePort csrWritePort);
 endinterface
 
 module mkWritebackStage(WritebackStage);
-    method ActionValue#(WB_OUT) writeback(MEM_WB mem_wb, GPRWritePort gprWritePort);
+    method ActionValue#(WB_OUT) writeback(MEM_WB mem_wb, GPRWritePort gprWritePort, CSRWritePort csrWritePort);
         let opcode = mem_wb.common.ir[6:0];
         let rd_    = mem_wb.common.ir[11:7];
+        let csr_   = mem_wb.common.ir[31:20];
 
-        match { .rd, .value } = case (opcode) matches
+        match { .rd, .gprValue, .csr, .csrValue } = case (opcode) matches
+            'b1110011: begin    // CSR
+                return tuple4(rd_, mem_wb.aluOutput, csr_, mem_wb.lmd);
+            end
             'b0000011: begin    // LOAD
-                return tuple2(rd_, mem_wb.lmd);
+                return tuple4(rd_, mem_wb.lmd, 0, 0);
             end
             'b0?10011: begin    // ALU
-                return tuple2(rd_, mem_wb.aluOutput);
+                return tuple4(rd_, mem_wb.aluOutput, 0, 0);
             end
             'b1100111: begin    // JALR
-                return tuple2(rd_, mem_wb.aluOutput);
+                return tuple4(rd_, mem_wb.aluOutput, 0, 0);
             end
             default: begin
-                return tuple2(0, 0);
+                return tuple4(0, 0, 0, 0);
             end
         endcase;
 
 `ifdef ENABLE_SPEW
-        $display("WB: Writing $%0x -> x%0d", value, rd);
+        $display("WB: GPR Writing $%0x -> x%0d", gprValue, rd);
+        $display("WB: CSR Writing $%0x -> x%0d", csrValue, csr);
 `endif
-        gprWritePort.write(rd, value);
+        gprWritePort.write(rd, gprValue);
+        csrWritePort.write(csr, csrValue);
 
         return WB_OUT {
             common: mem_wb.common,
-            writebackValue: value
+            csrWritebackValue: csrValue,
+            gprWritebackValue: gprValue
         };
     endmethod
 endmodule

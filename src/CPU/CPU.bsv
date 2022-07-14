@@ -145,15 +145,15 @@ module mkCPU#(
         //
         // Determine forwarded operands
         //
-        // match { .rs1Forward, .rs2Forward } = getForwardedOperands(id_ex, ex_mem_, mem_wb_);
-        let ops <- getForwardedOperands2(id_ex, ex_mem, mem_wb, wb_out);
-        match { .rs1Forward, .rs2Forward } = ops;
+        match { .rs1Forward, .rs2Forward } = getForwardedOperands(id_ex, ex_mem, mem_wb, wb_out);
 
         //
         // Process the pipeline
         //
-        ex_mem_ <- executeStage.execute(id_ex, rs1Forward, rs2Forward, epoch);
-        mem_wb_ <- memoryStage.accessMemory(ex_mem);
+
+        // First, run the execute stage since we need to feed its result
+        // to the decode stage this cycle
+        ex_mem_ <- executeStage.execute(id_ex, rs1Forward, rs2Forward, epoch, csrFile.csrWritePermission);
 
         let flipEpoch = False;
         if (ex_mem_.cond && id_ex.npc != ex_mem_.aluOutput) begin
@@ -163,16 +163,13 @@ module mkCPU#(
             flipEpoch = True;
         end
 
-        //
-
-        // $display("Forward EX_MEM_: ", fshow(ex_mem_));
-        // $display("Forward MEM_WB_: ", fshow(mem_wb_));
-        // $display("Forward RS1: ", fshow(rs1Forward));
-        // $display("Forward RS2: ", fshow(rs2Forward));
         if_id_  <- fetchStage.fetch(pc, ex_mem_, epoch);
-        id_ex_  <- decodeStage.decode(if_id, gprFile.gprReadPort1, gprFile.gprReadPort2);
+        id_ex_  <- decodeStage.decode(if_id, gprFile.gprReadPort1, gprFile.gprReadPort2, csrFile.csrReadPort);
 
-        wb_out_ <- writebackStage.writeback(mem_wb, gprFile.gprWritePort);
+        // NOTE: execute stage was executed above
+
+        mem_wb_ <- memoryStage.accessMemory(ex_mem);
+        wb_out_ <- writebackStage.writeback(mem_wb, gprFile.gprWritePort, csrFile.csrWritePort);
 
         if(if_id.common.isBubble) begin
             $display("Fetch   : Waiting for $%0x", pc);
@@ -224,7 +221,7 @@ module mkCPU#(
         end
 
         //
-        // If any stage is stalled, all staged *before* that are
+        // If any stage is stalled, all stages *before* that are
         // also stalled
         //
         if (memoryStage.isStalled) begin

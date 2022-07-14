@@ -15,11 +15,15 @@ typedef struct {
 } CSRWriteResult deriving(Bits, Eq, FShow);
 
 interface CSRReadPort;
-    method ActionValue#(CSRReadResult) readCSR(RVCSRIndex index);
+    method ActionValue#(CSRReadResult) read(RVCSRIndex index);
 endinterface
 
 interface CSRWritePort;
-    method ActionValue#(CSRWriteResult) writeCSR(RVCSRIndex index, Word value);
+    method ActionValue#(CSRWriteResult) write(RVCSRIndex index, Word value);
+endinterface
+
+interface CSRWritePermission;
+    method Bool isWriteable(RVCSRIndex index);
 endinterface
 
 interface TrapController;
@@ -31,8 +35,9 @@ interface CSRFile;
     method Action incrementCycleCounters;
     method Action incrementInstructionsRetiredCounter;
 
-    interface CSRReadPort  csrReadPort;
-    interface CSRWritePort csrWritePort;
+    interface CSRReadPort        csrReadPort;
+    interface CSRWritePort       csrWritePort;
+    interface CSRWritePermission csrWritePermission;
 
     interface TrapController trapController;
 endinterface
@@ -229,7 +234,7 @@ module mkCSRFile(CSRFile);
     // csrReadPort
     //
     interface CSRReadPort csrReadPort;
-        method ActionValue#(CSRReadResult) readCSR(RVCSRIndex index);
+        method ActionValue#(CSRReadResult) read(RVCSRIndex index);
             let result = CSRReadResult {
                 value: 0,
                 denied: True
@@ -247,7 +252,7 @@ module mkCSRFile(CSRFile);
     // csrWritePort
     //
     interface CSRWritePort csrWritePort;
-        method ActionValue#(CSRWriteResult) writeCSR(RVCSRIndex index, Word value);
+        method ActionValue#(CSRWriteResult) write(RVCSRIndex index, Word value);
             let result = CSRWriteResult {
                 denied: True
             };
@@ -259,6 +264,16 @@ module mkCSRFile(CSRFile);
             return result;
         endmethod
     endinterface
+
+    //
+    // csrWritePermission
+    //
+    interface CSRWritePermission csrWritePermission;
+        method Bool isWriteable(RVCSRIndex index);
+            return (currentPriv >= index[9:8] && index[11:10] != 'b11);
+        endmethod
+    endinterface
+
 
     //
     // trapController

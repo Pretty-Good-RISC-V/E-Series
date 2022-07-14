@@ -48,17 +48,19 @@ typedef struct {
     Word                   npc;     // Next program counter
     Word                   a;       // Operand 1
     Word                   b;       // Operand 2
+    Bool                   isBValid;// In the case of a CSR, this will indicate if 'b' is valid 
     Word                   imm;     // Sign extended immediate
 } ID_EX deriving(Bits, Eq, FShow);
 
 instance DefaultValue #(ID_EX);
     defaultValue = ID_EX {
-        common: defaultValue,
-        epoch:  0,
-        npc:    'hbeefbeef,
-        a:      0,
-        b:      0,
-        imm:    0
+        common:   defaultValue,
+        epoch:    0,
+        npc:      'hbeefbeef,
+        a:        0,
+        b:        0,
+        isBValid: False,
+        imm:      0
     };
 endinstance
 
@@ -103,12 +105,14 @@ endinstance
 //
 typedef struct {
     PipelineRegisterCommon common;
-    Word writebackValue;                // Value written to register file
+    Word csrWritebackValue;
+    Word gprWritebackValue;
 } WB_OUT deriving(Bits, Eq, FShow);
 
 instance DefaultValue#(WB_OUT);
     defaultValue = WB_OUT {
-        common:     defaultValue,
-        writebackValue: 0
+        common:            defaultValue,
+        gprWritebackValue: 0,
+        csrWritebackValue: 0
     };
 endinstance

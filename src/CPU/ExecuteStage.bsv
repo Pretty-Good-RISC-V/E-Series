@@ -1,6 +1,7 @@
 import PGRV::*;
 import ALU::*;
 import BranchUnit::*;
+import CSRFile::*;
 import PipelineRegisters::*;
 import Trap::*;
 
@@ -9,7 +10,7 @@ import GetPut::*;
 `undef ENABLE_SPEW
 
 interface ExecuteStage;
-    method ActionValue#(EX_MEM) execute(ID_EX id_ex, Maybe#(Word) a_forward, Maybe#(Word) b_forward, Bit#(1) epoch);
+    method ActionValue#(EX_MEM) execute(ID_EX id_ex, Maybe#(Word) a_forward, Maybe#(Word) b_forward, Bit#(1) epoch, CSRWritePermission csrWritePermission);
 endinterface
 
 module mkExecuteStage(ExecuteStage);
@@ -24,7 +25,7 @@ module mkExecuteStage(ExecuteStage);
         end
     endfunction
 
-    method ActionValue#(EX_MEM) execute(ID_EX id_ex, Maybe#(Word) a_forward, Maybe#(Word) b_forward, Bit#(1) epoch);
+    method ActionValue#(EX_MEM) execute(ID_EX id_ex, Maybe#(Word) a_forward, Maybe#(Word) b_forward, Bit#(1) epoch, CSRWritePermission csrWritePermission);
         let func7  = id_ex.common.ir[31:25];
         let func3  = id_ex.common.ir[14:12];
         let opcode = id_ex.common.ir[6:0];
@@ -45,6 +46,8 @@ module mkExecuteStage(ExecuteStage);
         let aluOperation     = {1'b0, func7, func3};
         let branchTaken      = False;
         let illegalOperation = True;
+        let csr              = id_ex.common.ir[31:20];
+        let isCSRImmediate   = unpack(id_ex.common.ir[14]);
 
         // Check if instruction epoch matches the pipline epoch.  If not,
         // the instruction stream for this instruction is stale.
@@ -78,7 +81,7 @@ module mkExecuteStage(ExecuteStage);
                         let branchResult   <- bru.isTaken(func3, a, b);
 
 `ifdef ENABLE_SPEW
-                        $display("EXECUTE: BRANCH - A: $%0x, B: $%0x", a, b);
+                        $display("EXECUTE: BRANCH - OP: %0b, $%0x, B: $%0x", func3, a, b);
                         $display("EXECUTE: BRANCH RESULT: ", fshow(branchResult));
 `endif
 
@@ -146,16 +149,33 @@ module mkExecuteStage(ExecuteStage);
 
                     // System (CSRRW/CSRRWI)
                     'b????????????_?????_?01_?????_1110011: begin
+                        aluOutput = (isCSRImmediate ? id_ex.imm : id_ex.b); // GPRWriteback
+                        b = id_ex.a;                                        // CSRWriteback
+
+                        if (!csrWritePermission.isWriteable(csr)) begin
+                            illegalOperation = True;
+                        end
                     end
 
                     // System (CSRRS/CSRRSI)
                     'b????????????_?????_?10_?????_1110011: begin
+                        aluOutput = (isCSRImmediate ? id_ex.imm : id_ex.b); // GPRWriteback
+                        b = id_ex.a | aluOutput;                            // CSRWriteback
+
+                        if (!csrWritePermission.isWriteable(csr)) begin
+                            illegalOperation = True;
+                        end
                     end
 
                     // System (CSRRC/CSRRCI)
                     'b????????????_?????_?11_?????_1110011: begin
-                    end
+                        aluOutput = (isCSRImmediate ? id_ex.imm : id_ex.b); // GPRWriteback
+                        b = ~id_ex.a & aluOutput;                           // CSRWriteback
 
+                        if (!csrWritePermission.isWriteable(csr)) begin
+                            illegalOperation = True;
+                        end
+                    end
                 endcase
 
                 if (illegalOperation) begin

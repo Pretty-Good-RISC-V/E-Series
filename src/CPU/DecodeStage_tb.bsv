@@ -1,4 +1,5 @@
 import PGRV::*;
+import CSRFile::*;
 import DecodeStage::*;
 import GPRFile::*;
 import PipelineRegisters::*;
@@ -10,6 +11,7 @@ import StmtFSM::*;
 module mkDecodeStage_tb(Empty);
     GPRFile gprFile <- mkGPRFile;
     DecodeStage dut <- mkDecodeStage;
+    CSRFile csrFile <- mkCSRFile;
 
     Reg#(Word) gprIndex <- mkRegU;
     Stmt testMachine = 
@@ -22,9 +24,9 @@ module mkDecodeStage_tb(Empty);
             seq
                action
                     let if_id = IF_ID { common: PipelineRegisterCommon { ir: 'h00a00093, pc: 'h00000000, isBubble: False, trap: tagged Invalid  }, epoch: 'h0, npc: 'h00000004 };
-                    let result <- dut.decode(if_id, gprFile.gprReadPort1, gprFile.gprReadPort2);
+                    let result <- dut.decode(if_id, gprFile.gprReadPort1, gprFile.gprReadPort2, csrFile.csrReadPort);
 
-                    let expected = ID_EX { common: PipelineRegisterCommon { ir: 'h00a00093, pc: 'h00000000, isBubble: False, trap: tagged Invalid  }, epoch: 'h0, npc: 'h00000004, a: 'h00000000, b: 'h00000000, imm: 'h0000000a };
+                    let expected = ID_EX { common: PipelineRegisterCommon { ir: 'h00a00093, pc: 'h00000000, isBubble: False, trap: tagged Invalid  }, epoch: 'h0, npc: 'h00000004, a: 'h00000000, b: 'h00000000, isBValid: True, imm: 'h0000000a };
                     $display("result  : ", fshow(result));
                     $display("expected: ", fshow(expected));
                     dynamicAssert(result == expected, "ID_EX should match what's expected");
@@ -38,9 +40,9 @@ module mkDecodeStage_tb(Empty);
             seq
                action
                     let if_id = IF_ID { common: PipelineRegisterCommon { ir: 'h01400113, pc: 'h00000004, isBubble: False, trap: tagged Invalid  }, epoch: 'h0, npc: 'h00000008 };
-                    let result <- dut.decode(if_id, gprFile.gprReadPort1, gprFile.gprReadPort2);
+                    let result <- dut.decode(if_id, gprFile.gprReadPort1, gprFile.gprReadPort2, csrFile.csrReadPort);
 
-                    let expected = ID_EX { common: PipelineRegisterCommon { ir: 'h01400113, pc: 'h00000004, isBubble: False, trap: tagged Invalid  }, epoch: 'h0, npc: 'h00000008, a: 'h00000000, b: 'h00000000, imm: 'h00000014 };
+                    let expected = ID_EX { common: PipelineRegisterCommon { ir: 'h01400113, pc: 'h00000004, isBubble: False, trap: tagged Invalid  }, epoch: 'h0, npc: 'h00000008, a: 'h00000000, b: 'h00000000, isBValid: True, imm: 'h00000014 };
                     $display("result  : ", fshow(result));
                     $display("expected: ", fshow(expected));
                     dynamicAssert(result == expected, "ID_EX should match what's expected");
@@ -54,9 +56,9 @@ module mkDecodeStage_tb(Empty);
             seq
                action
                     let if_id = IF_ID { common: PipelineRegisterCommon { ir: 'h01e00493, pc: 'h00000008, isBubble: False, trap: tagged Invalid  }, epoch: 'h0, npc: 'h0000000c };
-                    let result <- dut.decode(if_id, gprFile.gprReadPort1, gprFile.gprReadPort2);
+                    let result <- dut.decode(if_id, gprFile.gprReadPort1, gprFile.gprReadPort2, csrFile.csrReadPort);
 
-                    let expected = ID_EX { common: PipelineRegisterCommon { ir: 'h01e00493, pc: 'h00000008, isBubble: False, trap: tagged Invalid  }, epoch: 'h0, npc: 'h0000000c, a: 'h00000000, b: 'h00000000, imm: 'h0000001e };
+                    let expected = ID_EX { common: PipelineRegisterCommon { ir: 'h01e00493, pc: 'h00000008, isBubble: False, trap: tagged Invalid  }, epoch: 'h0, npc: 'h0000000c, a: 'h00000000, b: 'h00000000, isBValid: True, imm: 'h0000001e };
                     $display("result  : ", fshow(result));
                     $display("expected: ", fshow(expected));
                     dynamicAssert(result == expected, "ID_EX should match what's expected");
@@ -70,9 +72,9 @@ module mkDecodeStage_tb(Empty);
             seq
                action
                     let if_id = IF_ID { common: PipelineRegisterCommon { ir: 'h002081b3, pc: 'h0000000c, isBubble: False, trap: tagged Invalid  }, epoch: 'h0, npc: 'h0000000c };
-                    let result <- dut.decode(if_id, gprFile.gprReadPort1, gprFile.gprReadPort2);
+                    let result <- dut.decode(if_id, gprFile.gprReadPort1, gprFile.gprReadPort2, csrFile.csrReadPort);
 
-                    let expected = ID_EX { common: PipelineRegisterCommon { ir: 'h002081b3, pc: 'h0000000c, isBubble: False, trap: tagged Invalid  }, epoch: 'h0, npc: 'h0000000c, a: 'h0000000a, b: 'h00000014, imm: 'h00000002 };
+                    let expected = ID_EX { common: PipelineRegisterCommon { ir: 'h002081b3, pc: 'h0000000c, isBubble: False, trap: tagged Invalid  }, epoch: 'h0, npc: 'h0000000c, a: 'h0000000a, b: 'h00000014, isBValid: True, imm: 'h00000002 };
                     $display("result  : ", fshow(result));
                     $display("expected: ", fshow(expected));
                     dynamicAssert(result == expected, "ID_EX should match what's expected");
@@ -86,9 +88,9 @@ module mkDecodeStage_tb(Empty);
             seq
                action
                     let if_id = IF_ID { common: PipelineRegisterCommon { ir: 'h00919463, pc: 'h00000010, isBubble: False, trap: tagged Invalid  }, epoch: 'h0, npc: 'h00000014 };
-                    let result <- dut.decode(if_id, gprFile.gprReadPort1, gprFile.gprReadPort2);
+                    let result <- dut.decode(if_id, gprFile.gprReadPort1, gprFile.gprReadPort2, csrFile.csrReadPort);
 
-                    let expected = ID_EX { common: PipelineRegisterCommon { ir: 'h00919463, pc: 'h00000010, isBubble: False, trap: tagged Invalid  }, epoch: 'h0, npc: 'h00000014, a: 'h0000001e, b: 'h0000001e, imm: 'h00000008 };
+                    let expected = ID_EX { common: PipelineRegisterCommon { ir: 'h00919463, pc: 'h00000010, isBubble: False, trap: tagged Invalid  }, epoch: 'h0, npc: 'h00000014, a: 'h0000001e, b: 'h0000001e, isBValid: True, imm: 'h00000008 };
                     $display("result  : ", fshow(result));
                     $display("expected: ", fshow(expected));
                     dynamicAssert(result == expected, "ID_EX should match what's expected");
@@ -99,9 +101,9 @@ module mkDecodeStage_tb(Empty);
             seq
                action
                     let if_id = IF_ID { common: PipelineRegisterCommon { ir: 'h0000006f, pc: 'h00000014, isBubble: False, trap: tagged Invalid  }, epoch: 'h0, npc: 'h00000018 };
-                    let result <- dut.decode(if_id, gprFile.gprReadPort1, gprFile.gprReadPort2);
+                    let result <- dut.decode(if_id, gprFile.gprReadPort1, gprFile.gprReadPort2, csrFile.csrReadPort);
 
-                    let expected = ID_EX { common: PipelineRegisterCommon { ir: 'h0000006f, pc: 'h00000014, isBubble: False, trap: tagged Invalid  }, epoch: 'h0, npc: 'h00000018, a: 'h00000000, b: 'h00000000, imm: 'h00000000 };
+                    let expected = ID_EX { common: PipelineRegisterCommon { ir: 'h0000006f, pc: 'h00000014, isBubble: False, trap: tagged Invalid  }, epoch: 'h0, npc: 'h00000018, a: 'h00000000, b: 'h00000000, isBValid: True, imm: 'h00000000 };
                     $display("result  : ", fshow(result));
                     $display("expected: ", fshow(expected));
                     dynamicAssert(result == expected, "ID_EX should match what's expected");
@@ -112,9 +114,9 @@ module mkDecodeStage_tb(Empty);
             seq
                action
                     let if_id = IF_ID { common: PipelineRegisterCommon { ir: 'h0000006f, pc: 'h00000018, isBubble: False, trap: tagged Invalid  }, epoch: 'h0, npc: 'h00000018 };
-                    let result <- dut.decode(if_id, gprFile.gprReadPort1, gprFile.gprReadPort2);
+                    let result <- dut.decode(if_id, gprFile.gprReadPort1, gprFile.gprReadPort2, csrFile.csrReadPort);
 
-                    let expected = ID_EX { common: PipelineRegisterCommon { ir: 'h0000006f, pc: 'h00000018, isBubble: False, trap: tagged Invalid  }, epoch: 'h0, npc: 'h00000018, a: 'h00000000, b: 'h00000000, imm: 'h00000000 };
+                    let expected = ID_EX { common: PipelineRegisterCommon { ir: 'h0000006f, pc: 'h00000018, isBubble: False, trap: tagged Invalid  }, epoch: 'h0, npc: 'h00000018, a: 'h00000000, b: 'h00000000, isBValid: True, imm: 'h00000000 };
                     $display("result  : ", fshow(result));
                     $display("expected: ", fshow(expected));
                     dynamicAssert(result == expected, "ID_EX should match what's expected");

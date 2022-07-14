@@ -1,16 +1,19 @@
 import PGRV::*;
+import CSRFile::*;
 import PipelineRegisters::*;
 import GPRFile::*;
 
 interface DecodeStage;
-    method ActionValue#(ID_EX) decode(IF_ID if_id, GPRReadPort gprReadPort1, GPRReadPort gprReadPort2);
+    method ActionValue#(ID_EX) decode(IF_ID if_id, GPRReadPort gprReadPort1, GPRReadPort gprReadPort2, CSRReadPort csrReadPort);
 endinterface
 
 module mkDecodeStage(DecodeStage);
-    method ActionValue#(ID_EX) decode(IF_ID if_id, GPRReadPort gprReadPort1, GPRReadPort gprReadPort2);
+    method ActionValue#(ID_EX) decode(IF_ID if_id, GPRReadPort gprReadPort1, GPRReadPort gprReadPort2, CSRReadPort csrReadPort);
         // Instruction field extraction
+        let csr    = if_id.common.ir[31:20];
         let rs2    = if_id.common.ir[24:20];
         let rs1    = if_id.common.ir[19:15];
+        let rd     = if_id.common.ir[11:7];
         let opcode = if_id.common.ir[6:0];
 
         // Determine immediate value stored in the instruction
@@ -63,17 +66,33 @@ module mkDecodeStage(DecodeStage);
             end
         endcase;
 
-        // Read GPR registers
+        // Read GPR/CSR registers
         let a = gprReadPort1.read(rs1);
-        let b = gprReadPort2.read(rs2);
+        let b = ?;
+        let isBValid = True;
+        if (opcode == 'b1110011) begin
+            if (rd != 0) begin
+                let csrReadResult <- csrReadPort.read(csr);
+                b = csrReadResult.value;
+                isBValid = csrReadResult.denied;
+            end else begin
+                b = 0;
+                isBValid = True;
+            end
+        end else begin
+            $display("Decode: RS2 = %0d", rs2);
+            b = gprReadPort2.read(rs2);
+            isBValid = True;
+        end
 
         return ID_EX {
-            common: if_id.common,
-            epoch:  if_id.epoch,
-            npc:    if_id.npc,
-            a:      a,
-            b:      b,
-            imm:    imm
+            common:   if_id.common,
+            epoch:    if_id.epoch,
+            npc:      if_id.npc,
+            a:        a,
+            b:        b,
+            isBValid: isBValid,
+            imm:      imm
         };
     endmethod
 endmodule
