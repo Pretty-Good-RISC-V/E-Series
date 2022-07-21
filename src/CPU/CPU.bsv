@@ -153,7 +153,7 @@ module mkCPU#(
 
         // First, run the execute stage since we need to feed its result
         // to the decode stage this cycle
-        ex_mem_ <- executeStage.execute(id_ex, rs1Forward, rs2Forward, epoch, csrFile.csrWritePermission);
+        ex_mem_ <- executeStage.execute(id_ex, rs1Forward, rs2Forward, epoch, csrFile.trapController, csrFile.csrWritePermission);
 
         let flipEpoch = False;
         if (ex_mem_.cond && id_ex.npc != ex_mem_.aluOutput) begin
@@ -172,45 +172,45 @@ module mkCPU#(
         wb_out_ <- writebackStage.writeback(mem_wb, gprFile.gprWritePort, csrFile.csrWritePort);
 
         if(if_id.common.isBubble) begin
-            $display("Fetch   : Waiting for $%0x", pc);
+            $display("> Fetch   : Waiting for $%0x", pc);
         end else begin
-            $display("Fetch   : Requesting $%0x", pc);
+            $display("> Fetch   : Requesting $%0x", pc);
         end
 
         if (if_id.common.isBubble) begin
-            $display("Decode  : ** BUBBLE ** ");
+            $display("> Decode  : ** BUBBLE ** ");
         end else begin
-            $display("Decode  : ", fshow(if_id));
+            $display("> Decode  :  ", fshow(if_id));
         end
 
         if (id_ex.common.isBubble) begin
-            $display("Execute : ** BUBBLE **");
+            $display("> Execute : ** BUBBLE **");
         end else begin
             if (id_ex.epoch != epoch) begin
-                $display("Execute : *STALE* ", fshow(id_ex));
+                $display("> Execute : *STALE* ", fshow(id_ex));
             end else begin
-                $display("Execute : ", fshow(id_ex));
+                $display("> Execute :  ", fshow(id_ex));
             end
         end
 
         if (ex_mem.common.isBubble) begin
-            $display("Memory  : ** BUBBLE **");
+            $display("> Memory  : ** BUBBLE **");
         end else begin
-            $display("Memory  : ", fshow(ex_mem));
+            $display("> Memory  : ", fshow(ex_mem));
         end
 
         if (mem_wb.common.isBubble) begin
-            $display("WriteB  : ** BUBBLE **");
+            $display("> WriteB  : ** BUBBLE **");
         end else begin
-            $display("WriteB  : ", fshow(mem_wb));
+            $display("> WriteB  : ", fshow(mem_wb));
         end
 
         //
         // Check for traps (and update the program counter to the trap handler if one exists)
         //
-        if (wb_out_.common.trap matches tagged Valid .trap) begin
-            pc_ <- csrFile.trapController.beginTrap(trap);
-            $display("TRAP DETECTED: Jumping to $%0x", pc_);
+        if (ex_mem_.common.trap matches tagged Valid .trap) begin
+            pc_ <- csrFile.trapController.beginTrap(ex_mem.common.pc, trap);
+            $display("> TRAP DETECTED: Jumping to $%0x", pc_);
             flipEpoch = True;
         end else begin
             pc_ = (ex_mem_.cond ? ex_mem_.aluOutput : if_id_.npc);

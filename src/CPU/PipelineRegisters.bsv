@@ -59,7 +59,7 @@ instance DefaultValue #(ID_EX);
         npc:      'hbeefbeef,
         a:        0,
         b:        0,
-        isBValid: False,
+        isBValid: True,
         imm:      0
     };
 endinstance

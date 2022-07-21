@@ -63,6 +63,7 @@ module mkCPU_tb(Empty);
 
     // Cycle counter
     Reg#(Bit#(XLEN)) cycle <- mkReg(0);
+    let maxCycles = 9;
 
     //
     // Program Memory
@@ -98,32 +99,56 @@ module mkCPU_tb(Empty);
         'hdeadbeef
     };
     
-    // PipelineState pipelineStates[3] = {
-    //     PipelineState {
-    //         pc: 'h0000_0000,
-    //         if_id:  defaultValue,
-    //         id_ex:  defaultValue,
-    //         ex_mem: defaultValue,
-    //         mem_wb: defaultValue,
-    //         wb_out: defaultValue
-    //     },
-    //     PipelineState {
-    //         pc: 'h0000_0000,
-    //         if_id:  defaultValue,
-    //         id_ex:  defaultValue,
-    //         ex_mem: defaultValue,
-    //         mem_wb: defaultValue,
-    //         wb_out: defaultValue
-    //     },
-    //     PipelineState {
-    //         pc: 'h0000_0000,
-    //         if_id:  IF_ID { common: PipelineRegisterCommon { ir: 'h00a00093, pc: 'h00000000, isBubble: False, trap: tagged Invalid  }, epoch: 'h0, npc: 'h00000004 },
-    //         id_ex:  ID_EX { common: PipelineRegisterCommon { ir: 'h00a00093, pc: 'h00000000, isBubble: False, trap: tagged Invalid  }, epoch: 'h0, npc: 'h00000004, a: 'h00000000, b: 'h00000000, imm: 'h0000000a },
-    //         ex_mem: EX_MEM { common: PipelineRegisterCommon { ir: 'h00a00093, pc: 'h00000000, isBubble: False, trap: tagged Invalid  }, aluOutput: 'h0000000a, b: 'h00000000, cond: False },
-    //         mem_wb: MEM_WB { common: PipelineRegisterCommon { ir: 'h00a00093, pc: 'h00000000, isBubble: False, trap: tagged Invalid  }, aluOutput: 'h0000000a, lmd: 'h00000000 },
-    //         wb_out: defaultValue
-    //     }
-    // };
+    PipelineState pipelineStates[6] = {
+        PipelineState { // Cycle 0
+            pc: 'h0000_0000,
+            if_id:  defaultValue,
+            id_ex:  defaultValue,
+            ex_mem: defaultValue,
+            mem_wb: defaultValue,
+            wb_out: defaultValue
+        },
+        PipelineState { // Cycle 1
+            pc: 'h0000_0000,
+            if_id:  defaultValue,
+            id_ex:  defaultValue,
+            ex_mem: defaultValue,
+            mem_wb: defaultValue,
+            wb_out: defaultValue
+        },
+        PipelineState { // Cycle 2
+            pc: 'h0000_0004,
+            if_id:  IF_ID { common: PipelineRegisterCommon { ir: 'h00a00093, pc: 'h00000000, isBubble: False, trap: tagged Invalid  }, epoch: 'h0, npc: 'h00000004 },
+            id_ex:  defaultValue,
+            ex_mem: defaultValue,
+            mem_wb: defaultValue,
+            wb_out: defaultValue
+        },
+        PipelineState { // Cycle 3
+            pc: 'h0000_0008,
+            if_id:  IF_ID { common: PipelineRegisterCommon { ir: 'h01400113, pc: 'h00000004, isBubble: False, trap: tagged Invalid  }, epoch: 'h0, npc: 'h00000008 },
+            id_ex:  ID_EX { common: PipelineRegisterCommon { ir: 'h00a00093, pc: 'h00000000, isBubble: False, trap: tagged Invalid  }, epoch: 'h0, npc: 'h00000004, a: 'h00000000, b: 'h00000000, isBValid: True, imm: 'h0000000a },
+            ex_mem: defaultValue,
+            mem_wb: defaultValue,
+            wb_out: defaultValue
+        },
+        PipelineState { // Cycle 4
+            pc: 'h0000_000C,
+            if_id:  IF_ID { common: PipelineRegisterCommon { ir: 'h01e00493, pc: 'h00000008, isBubble: False, trap: tagged Invalid  }, epoch: 'h0, npc: 'h0000000c },
+            id_ex:  ID_EX { common: PipelineRegisterCommon { ir: 'h01400113, pc: 'h00000004, isBubble: False, trap: tagged Invalid  }, epoch: 'h0, npc: 'h00000008, a: 'h00000000, b: 'h00000000, isBValid: True, imm: 'h00000014 },
+            ex_mem: EX_MEM { common: PipelineRegisterCommon { ir: 'h00a00093, pc: 'h00000000, isBubble: False, trap: tagged Invalid  }, aluOutput: 'h0000000a, b: 'h00000000, cond: False },
+            mem_wb: defaultValue,
+            wb_out: defaultValue
+        },
+        PipelineState { // Cycle 5
+            pc: 'h0000_0010,
+            if_id:  IF_ID { common: PipelineRegisterCommon { ir: 'h002081b3, pc: 'h0000000c, isBubble: False, trap: tagged Invalid  }, epoch: 'h0, npc: 'h00000010 },
+            id_ex:  ID_EX { common: PipelineRegisterCommon { ir: 'h01e00493, pc: 'h00000008, isBubble: False, trap: tagged Invalid  }, epoch: 'h0, npc: 'h0000000c, a: 'h00000000, b: 'h00000000, isBValid: True, imm: 'h0000001e },
+            ex_mem: EX_MEM { common: PipelineRegisterCommon { ir: 'h01400113, pc: 'h00000004, isBubble: False, trap: tagged Invalid  }, aluOutput: 'h00000014, b: 'h00000000, cond: False },
+            mem_wb: MEM_WB { common: PipelineRegisterCommon { ir: 'h00a00093, pc: 'h00000000, isBubble: False, trap: tagged Invalid  }, aluOutput: 'h0000000a, lmd: 'h00000000 },
+            wb_out: defaultValue
+        }
+    };
 
     //
     // Simulated instruction memory server
@@ -143,16 +168,16 @@ module mkCPU_tb(Empty);
     rule handleDataMemoryRequest;
         if (dataMemoryLatencyCounter > 0) begin
             let memoryRequest = dataMemoryRequests.first();
-            $display("---------------");
-            $display("Cycle : %0d", cycle);
-            $display("DMemory request received: ", fshow(memoryRequest));
-            $display("DMemory delay cycles remaining: ", dataMemoryLatencyCounter);
+            $display("> ---------------");
+            $display("> Cycle : %0d", cycle);
+            $display("> DMemory request received: ", fshow(memoryRequest));
+            $display("> DMemory delay cycles remaining: ", dataMemoryLatencyCounter);
         end else begin
             let memoryRequest <- pop(dataMemoryRequests);
 
-            $display("---------------");
-            $display("Cycle : %0d", cycle);
-            $display("DMemory latency expired - responding to memory request: ", fshow(memoryRequest));
+            $display("> ---------------");
+            $display("> Cycle : %0d", cycle);
+            $display("> DMemory latency expired - responding to memory request: ", fshow(memoryRequest));
 
             let wordIndex = memoryRequest.address >> 2;
             if (wordIndex < instructionCount) begin
@@ -165,7 +190,7 @@ module mkCPU_tb(Empty);
                     data: 'hCCCC_CCCC,
                     denied: True
                 });
-                $display("Exitting on invalid data memory access: $%0x", memoryRequest.address);
+                $display("> Exitting on invalid data memory access: $%0x", memoryRequest.address);
                 $fatal();
             end
         end
@@ -174,16 +199,21 @@ module mkCPU_tb(Empty);
     endrule
 
     rule test(dut.getState == READY);
-        $display("-----------------------------");
-        $display("Cycle   : %0d", cycle);
+        $display("> -----------------------------");
+        $display("> Cycle   : %0d", cycle);
 
         // $display("Expected State: ", fshow(pipelineStates[cycle]));
-        // dynamicAssert(pipelineState == pipelineStates[cycle], "Pipeline state mismatch");
+        let pipelineState <- dut.getPipelineState.get;
+        if (pipelineState != pipelineStates[cycle]) begin
+            //$display("Expected: ", fshow(pipelineStates[cycle]));
+            //$display("Received: ", fshow(pipelineState));
+            //dynamicAssert(pipelineState == pipelineStates[cycle], "Pipeline state mismatch");
+        end
 
         // Step the DUT
         dut.step;
 
-        if (cycle > 20) begin
+        if (cycle >= maxCycles) begin
             $display("    PASS");
             $finish();
         end

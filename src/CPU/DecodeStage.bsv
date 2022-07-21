@@ -80,7 +80,6 @@ module mkDecodeStage(DecodeStage);
                 isBValid = True;
             end
         end else begin
-            $display("Decode: RS2 = %0d", rs2);
             b = gprReadPort2.read(rs2);
             isBValid = True;
         end

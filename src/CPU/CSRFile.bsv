@@ -27,7 +27,7 @@ interface CSRWritePermission;
 endinterface
 
 interface TrapController;
-    method ActionValue#(ProgramCounter) beginTrap(Trap trap);
+    method ActionValue#(ProgramCounter) beginTrap(ProgramCounter trapProgramCounter, Trap trap);
     method ActionValue#(ProgramCounter) endTrap;
 endinterface
 
@@ -221,6 +221,20 @@ module mkCSRFile(CSRFile);
         endactionvalue
     endfunction
 
+    function ActionValue#(CSRReadResult) readWithOffset1(RVPrivilegeLevel privilegeLevel, RVCSRIndexOffset offset);
+        actionvalue
+            let csrReadResult <- readInternal(getIndex(privilegeLevel, offset));
+            return csrReadResult;
+        endactionvalue
+    endfunction      
+
+    function ActionValue#(CSRWriteResult) writeWithOffset1(RVPrivilegeLevel privilegeLevel, RVCSRIndexOffset offset, Word value);
+        actionvalue
+            let csrWriteResult <- writeInternal(getIndex(privilegeLevel, offset), value);
+            return csrWriteResult;
+        endactionvalue
+    endfunction      
+
     method Action incrementCycleCounters;
         cycleCounter.incr(1);
         timeCounter.incr(1);
@@ -274,13 +288,51 @@ module mkCSRFile(CSRFile);
         endmethod
     endinterface
 
-
     //
     // trapController
     //
     interface TrapController trapController;
-        method ActionValue#(ProgramCounter) beginTrap(Trap trap);
-            return 0;
+        method ActionValue#(ProgramCounter) beginTrap(ProgramCounter trapProgramCounter, Trap trap);
+            Word cause = 0;
+
+            let trapPrivilegeLevel = getTrapPrivilegeLevel(trap);
+
+            cause = zeroExtend(trap.cause);
+            if (!trap.isInterrupt) begin
+                cause[valueOf(XLEN)-1] = 1;
+            end
+
+            // PC => MEPC
+            writeWithOffset1(trapPrivilegeLevel, csr_EPC, trapProgramCounter);  
+
+            // CurPriv => MSTATUS::MPP
+            let mstatus_  = mstatus;
+            mstatus_.mpp  = currentPriv;
+
+            // MSTATUS::MIE => MSTATUS::MPIE
+            mstatus_.mpie = mstatus.mie;
+            mstatus_.mie  = False;    // Disable interrupts
+            mstatus      <= mstatus_;
+
+            // cause => CAUSE
+            writeWithOffset1(trapPrivilegeLevel, csr_CAUSE, cause);
+            writeWithOffset1(trapPrivilegeLevel, csr_TVAL, trap.tval);
+
+            let readResult <- readWithOffset1(trapPrivilegeLevel, csr_TVEC);
+            Word vectorTableBase = readResult.value;
+            let trapHandler = vectorTableBase;
+
+            // Check and handle a vectored trap handler table
+            if (trapHandler[1:0] == 1) begin
+                trapHandler[1:0] = 0;
+                if(trap.isInterrupt) begin
+                    trapHandler = trapHandler + extend(4 * trap.cause);
+                end
+            end
+
+            currentPriv <= trapPrivilegeLevel;
+
+            return trapHandler;
         endmethod
 
         method ActionValue#(ProgramCounter) endTrap;

@@ -77,7 +77,8 @@ module mkFetchStage#(BranchPredictor branchPredictor)(FetchStage);
                     if (response.denied) begin
                         if_id.common.trap = tagged Valid Trap {
                             cause: exception_INSTRUCTION_ACCESS_FAULT,
-                            isInterrupt: False
+                            isInterrupt: False,
+                            tval: if_id.common.pc
                         };
                     end
 

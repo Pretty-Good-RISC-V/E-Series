@@ -11,6 +11,7 @@ target_link_libraries(${TEST_TARGET}
     CPU::CPU
     InstructionLogger::InstructionLogger
 )
+
 add_test(
     NAME ${TEST_TARGET}
     COMMAND "${CMAKE_SOURCE_DIR}/cmake/BSV-cmake/Wrappers/bsvtest" "${CMAKE_CURRENT_BINARY_DIR}/${TEST_TARGET}" 

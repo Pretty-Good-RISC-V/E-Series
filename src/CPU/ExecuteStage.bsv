@@ -7,10 +7,10 @@ import Trap::*;
 
 import GetPut::*;
 
-`undef ENABLE_SPEW
+`define ENABLE_SPEW
 
 interface ExecuteStage;
-    method ActionValue#(EX_MEM) execute(ID_EX id_ex, Maybe#(Word) a_forward, Maybe#(Word) b_forward, Bit#(1) epoch, CSRWritePermission csrWritePermission);
+    method ActionValue#(EX_MEM) execute(ID_EX id_ex, Maybe#(Word) a_forward, Maybe#(Word) b_forward, Bit#(1) epoch, TrapController trapController, CSRWritePermission csrWritePermission);
 endinterface
 
 module mkExecuteStage(ExecuteStage);
@@ -25,7 +25,7 @@ module mkExecuteStage(ExecuteStage);
         end
     endfunction
 
-    method ActionValue#(EX_MEM) execute(ID_EX id_ex, Maybe#(Word) a_forward, Maybe#(Word) b_forward, Bit#(1) epoch, CSRWritePermission csrWritePermission);
+    method ActionValue#(EX_MEM) execute(ID_EX id_ex, Maybe#(Word) a_forward, Maybe#(Word) b_forward, Bit#(1) epoch, TrapController trapController, CSRWritePermission csrWritePermission);
         let func7  = id_ex.common.ir[31:25];
         let func3  = id_ex.common.ir[14:12];
         let opcode = id_ex.common.ir[6:0];
@@ -43,11 +43,11 @@ module mkExecuteStage(ExecuteStage);
         Word aluOutput = ?;
         Bool cond      = False;
 
-        let aluOperation     = {1'b0, func7, func3};
         let branchTaken      = False;
         let illegalOperation = True;
         let csr              = id_ex.common.ir[31:20];
         let isCSRImmediate   = unpack(id_ex.common.ir[14]);
+        let pcOffset         = unpack(id_ex.common.pc) + signedImmediate;
 
         // Check if instruction epoch matches the pipline epoch.  If not,
         // the instruction stream for this instruction is stale.
@@ -59,16 +59,24 @@ module mkExecuteStage(ExecuteStage);
             // *not* exist, execute the instruction.
             Maybe#(Trap) trap = id_ex.common.trap;
             if (isValid(trap) == False) begin
-
                 // Execute the instruction
                 case(id_ex.common.ir) matches
+                    // AUIPC
+                    'b????????????_?????_???_?????_0010111: begin
+                        aluOutput           = pack(pcOffset);
+                        illegalOperation    = False;
+                    end
+
                     // ALU
                     'b????????????_?????_???_?????_0?10011: begin
-                        let aluIsImmediate  = ~opcode[5];
-                        let aluResult      <- alu.calculate(aluOperation, a, (unpack(aluIsImmediate) ? id_ex.imm : b));
+                        let aluIsImmediate  = unpack(~opcode[5]);
+                        let aluFunc7        = (aluIsImmediate ? 0 : func7);
+                        let aluOperation    = {1'b0, aluFunc7, func3};
+
+                        let aluResult      <- alu.calculate(aluOperation, a, (aluIsImmediate ? id_ex.imm : b));
 
 `ifdef ENABLE_SPEW
-                        $display("EXECUTE: ALU - A: $%0x, B: $%0x", a, (unpack(aluIsImmediate) ? id_ex.imm : b));
+                        $display("EXECUTE: ALU - OP: %0x, A: $%0x, B: $%0x", aluOperation, a, (unpack(aluIsImmediate) ? id_ex.imm : b));
 `endif
 
                         aluOutput           = aluResult.result;
@@ -77,7 +85,7 @@ module mkExecuteStage(ExecuteStage);
 
                     // Branch
                     'b????????????_?????_???_?????_1100011: begin
-                        let branchTarget    = unpack(id_ex.common.pc) + signedImmediate;
+                        let branchTarget    = pcOffset;
                         let branchResult   <- bru.isTaken(func3, a, b);
 
 `ifdef ENABLE_SPEW
@@ -93,7 +101,7 @@ module mkExecuteStage(ExecuteStage);
                     // Jumps
                     'b????????????_?????_???_?????_110?111: begin
                         let isJumpRelative  = (opcode == 'b1100111) && (func3 == 0); // JALR
-                        let jumpTarget      = (isJumpRelative ? ((unpack(a) + signedImmediate) & ~1) : unpack(id_ex.common.pc) + signedImmediate);
+                        let jumpTarget      = (isJumpRelative ? ((unpack(a) + signedImmediate) & ~1) : pcOffset);
                         let jumpLink        = unpack(id_ex.common.pc) + 4;
 
 `ifdef ENABLE_SPEW
@@ -127,6 +135,12 @@ module mkExecuteStage(ExecuteStage);
                         illegalOperation    = !loadStoreValid;
                     end
 
+                    // LUI
+                    'b????????????_?????_???_?????_0110111: begin
+                        aluOutput           = pack(signedImmediate);
+                        illegalOperation    = False;
+                    end
+
                     // System (ECALL)
                     'b000000000000_00000_000_00000_1110011: begin
                         trap = tagged Valid Trap {
@@ -134,7 +148,8 @@ module mkExecuteStage(ExecuteStage);
                             //       the handling of the exception will translate it
                             //       to the call proper for the mode of the processor.
                             cause: (exception_ENVIRONMENT_CALL_FROM_M_MODE),
-                            isInterrupt: False
+                            isInterrupt: False,
+                            tval: id_ex.common.pc
                         };
                         illegalOperation    = False;
                     end
@@ -143,8 +158,19 @@ module mkExecuteStage(ExecuteStage);
                     'b000000000001_00000_000_00000_1110011: begin
                         trap = tagged Valid Trap {
                             cause: exception_BREAKPOINT,
-                            isInterrupt: False
+                            isInterrupt: False,
+                            tval: id_ex.common.pc
                         };                
+                    end
+
+                    // System (MRET)
+                    'b001100000010_00000_000_00000_1110011: begin
+`ifdef ENABLE_SPEW
+                        $display("EXECUTE: Executing MRET");
+`endif
+                        aluOutput          <- trapController.endTrap;
+                        branchTaken         = True;
+                        illegalOperation    = False;
                     end
 
                     // System (CSRRW/CSRRWI)
@@ -152,8 +178,8 @@ module mkExecuteStage(ExecuteStage);
                         aluOutput = (isCSRImmediate ? id_ex.imm : id_ex.b); // GPRWriteback
                         b = id_ex.a;                                        // CSRWriteback
 
-                        if (!csrWritePermission.isWriteable(csr)) begin
-                            illegalOperation = True;
+                        if (csrWritePermission.isWriteable(csr)) begin
+                            illegalOperation = False;
                         end
                     end
 
@@ -162,8 +188,14 @@ module mkExecuteStage(ExecuteStage);
                         aluOutput = (isCSRImmediate ? id_ex.imm : id_ex.b); // GPRWriteback
                         b = id_ex.a | aluOutput;                            // CSRWriteback
 
-                        if (!csrWritePermission.isWriteable(csr)) begin
-                            illegalOperation = True;
+                        // if none of the mask bits are set, no writing to the CSR will
+                        // occur
+                        if (id_ex.a != 0) begin
+                            if (csrWritePermission.isWriteable(csr)) begin
+                                illegalOperation = False;
+                            end
+                        end else begin
+                            illegalOperation = False;
                         end
                     end
 
@@ -172,16 +204,24 @@ module mkExecuteStage(ExecuteStage);
                         aluOutput = (isCSRImmediate ? id_ex.imm : id_ex.b); // GPRWriteback
                         b = ~id_ex.a & aluOutput;                           // CSRWriteback
 
-                        if (!csrWritePermission.isWriteable(csr)) begin
-                            illegalOperation = True;
+                        // if none of the mask bits are set, no writing to the CSR will
+                        // occur
+                        if (id_ex.a != 0) begin
+                            if (csrWritePermission.isWriteable(csr)) begin
+                                illegalOperation = False;
+                            end
+                        end else begin
+                            illegalOperation = False;
                         end
                     end
+
                 endcase
 
                 if (illegalOperation) begin
                     trap = tagged Valid Trap {
                         cause: exception_ILLEGAL_INSTRUCTION,
-                        isInterrupt: False
+                        isInterrupt: False,
+                        tval: id_ex.common.pc
                     };               
                 end
             end

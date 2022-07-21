@@ -1,0 +1,6 @@
+= Pretty Good RISC-V E-Series Core ReadMe
+:showtitle!:
+:author: John W. Terrell <john@prettygoodriscv.org>
+:description: 
+:sectanchors:
+:url-repo: https://github.com/Pretty-Good-RISC-V/E-Series
