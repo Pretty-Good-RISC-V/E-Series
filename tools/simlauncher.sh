@@ -1,0 +1,105 @@
+#!/bin/bash
+#
+# Bluespec Simulation Driver
+#
+set -e
+
+function usage 
+{
+    echo "Usage: $1 [-m <maxcycles>] <elf_binaryfile>"
+}
+
+MAX_CYCLES=""
+INPUT=""
+CHECK=""
+SPIKE=""
+ISA="RV32I"
+LOGFILENAME_BASE=""
+SIGNATURE_FILENAME=""
+VCD_OPTIONS=""
+SIMHOST="__SPECIFY_SIMHOST__"
+
+while [[ $# -gt 0 ]]; do
+    key="$1"
+
+    case $key in
+        --sim-host)
+            SIMHOST="$2"
+            shift
+            shift
+            ;;
+        --max-cycles)
+            MAX_CYCLES="-m $2"
+            shift # past argument
+            shift # past value
+            ;;
+        --spike)
+            SPIKE="True"
+            shift
+            ;;
+        --vcd)
+            VCD_OPTIONS="-V $2"
+            shift
+            shift
+            ;;
+        --signature-file)
+            SIGNATURE_FILENAME="$2"
+            export SIGNATURE_FILENAME="${SIGNATURE_FILENAME}"
+            shift # past argument
+            shift # past value
+            ;;
+        --isa)
+            if [ "$2" == "RV32" ] || [ "$2" == "rv32i" ]; then
+                ISA="RV32I"
+            elif [ "$2" == "RV64" ] || [ "$2" == "rv64i" ]; then
+                ISA="RV64I"
+            fi
+            shift
+            shift
+            ;;
+        --log)
+            LOGFILENAME_BASE="${2%.*}"
+            export INSTRUCTION_LOG_FILENAME="${LOGFILENAME_BASE}.trace.txt"
+            shift
+            shift
+            ;;
+        --check)
+            CHECK="True"
+            shift
+            ;;
+        *)
+            # If it's a directory, assume it's an input file
+            POSITIONAL+=("$1")
+            shift # past argument
+            ;;
+  esac
+done
+
+if [ ${#POSITIONAL[@]} -eq 0 ]; then
+    usage
+    exit 1;
+fi
+
+export INPUT_FILE="${POSITIONAL[0]}"
+export PROGRAM_MEMORY_FILE="$INPUT_FILE" 
+
+# See if the spike simulator needs to be run
+if [ "$SPIKE" != "" ] && [ "$LOGFILENAME_BASE" != "" ]; then
+    spike --isa=$ISA -l --log=${LOGFILENAME_BASE}.trace.spike.txt $INPUT_FILE
+fi
+
+if [ "$CHECK" == "" ]; then
+    $SIMHOST +verbose $MAX_CYCLES $VCD_OPTIONS
+else
+    $SIMHOST +verbose $MAX_CYCLES $VCD_OPTIONS > /tmp/simoutput.txt
+
+    if [ "$LOGFILENAME_BASE" != "" ]; then
+        cp /tmp/simoutput.txt ${LOGFILENAME_BASE%.*}.stdout.txt
+    fi
+
+    if grep '    PASS' /tmp/simoutput.txt ; then
+        exit 0
+    else
+        exit 1
+    fi
+fi

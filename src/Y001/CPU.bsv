@@ -17,7 +17,7 @@ import ClientServer::*;
 import GetPut::*;
 import StmtFSM::*;
 
-`undef ENABLE_SPEW
+`define ENABLE_SPEW
 
 typedef struct {
     ProgramCounter pc;
@@ -36,7 +36,11 @@ typedef struct {
 typedef enum {
     RESET,
     INITIALIZING,
-    READY
+    FETCH,
+    DECODE,
+    EXECUTE,
+    MEMORY_ACCESS,
+    WRITEBACK
 } CPUState deriving(Bits, Eq, FShow);
 
 interface CPU;
@@ -65,16 +69,13 @@ module mkCPU#(
     Reg#(MEM_WB)         mem_wb <- mkReg(defaultValue);
     Reg#(WB_OUT)         wb_out <- mkReg(defaultValue);
 
-    // Pipeline epoch
-    Reg#(Bit#(1))        epoch  <- mkReg(0);
-
     // General purpose register (GPR) file
     GPRFile              gprFile <- mkGPRFile;
 
     // Constrol and status register (CSR) file
     CSRFile              csrFile <- mkCSRFile;
 
-    // Pipeline stages
+    // Stages (unpipelined)
     FetchStage           fetchStage     <- mkFetchStage(bp);  // Stage 1
     DecodeStage          decodeStage    <- mkDecodeStage;     // Stage 2
     ExecuteStage         executeStage   <- mkExecuteStage;    // Stage 3
@@ -95,7 +96,7 @@ module mkCPU#(
         for (gprInitIndex <= 0; gprInitIndex <= 32; gprInitIndex <= gprInitIndex + 1)
             gprFile.gprWritePort.write(truncate(gprInitIndex), 0);
 
-        state <= READY;
+        state <= FETCH;
     endseq);
 
     FSM initializationMachine <- mkFSMWithPred(initializationStatements, state == INITIALIZING);
@@ -131,60 +132,31 @@ module mkCPU#(
         return state;
     endmethod
 
-    method Action step if(state == READY);
-        //
-        // Forward declarations of intermediate pipeline structures
-        //
-        ProgramCounter  pc_;
-        IF_ID           if_id_;
-        ID_EX           id_ex_;
-        EX_MEM          ex_mem_;
-        MEM_WB          mem_wb_;
-        WB_OUT          wb_out_;
+    method Action step;
+        Bit#(1) epoch = 0; // Hardcoded in non-pipelined implementation
 
         //
-        // Determine forwarded operands
+        // Dump state
         //
-        match { .rs1Forward, .rs2Forward } = getForwardedOperands(id_ex, ex_mem, mem_wb, wb_out);
-
-        //
-        // Process the pipeline
-        //
-
-        // First, run the execute stage since we need to feed its result
-        // to the decode stage this cycle
-        ex_mem_ <- executeStage.execute(id_ex, rs1Forward, rs2Forward, epoch, csrFile.trapController, csrFile.csrWritePermission);
-
-        let flipEpoch = False;
-        if (ex_mem_.cond && id_ex.npc != ex_mem_.aluOutput) begin
-`ifdef ENABLE_SPEW
-            $display("Branch not as prediced...updating epoch");
-`endif
-            flipEpoch = True;
-        end
-
-        if_id_  <- fetchStage.fetch(pc, ex_mem_, epoch);
-        id_ex_  <- decodeStage.decode(if_id, gprFile.gprReadPort1, gprFile.gprReadPort2, csrFile.csrReadPort);
-
-        // NOTE: execute stage was executed above
-
-        mem_wb_ <- memoryStage.accessMemory(ex_mem);
-        wb_out_ <- writebackStage.writeback(mem_wb, gprFile.gprWritePort, csrFile.csrWritePort);
-
-        if(if_id.common.isBubble) begin
-            $display("> Fetch   : Waiting for $%0x", pc);
+        $display("> STATE   : ", fshow(state));
+        if (state != FETCH) begin
+            $display("> Fetch   : ** IDLE **");
         end else begin
             $display("> Fetch   : Requesting $%0x", pc);
         end
 
         if (if_id.common.isBubble) begin
-            $display("> Decode  : ** BUBBLE ** ");
+            $display("> Decode  : ** IDLE ** ");
         end else begin
-            $display("> Decode  :  ", fshow(if_id));
+            if (if_id.epoch != epoch) begin
+                $display("> Decode  : *STALE* ", fshow(if_id));
+            end else begin
+                $display("> Decode  :  ", fshow(if_id));
+            end
         end
 
         if (id_ex.common.isBubble) begin
-            $display("> Execute : ** BUBBLE **");
+            $display("> Execute : ** IDLE **");
         end else begin
             if (id_ex.epoch != epoch) begin
                 $display("> Execute : *STALE* ", fshow(id_ex));
@@ -194,81 +166,91 @@ module mkCPU#(
         end
 
         if (ex_mem.common.isBubble) begin
-            $display("> Memory  : ** BUBBLE **");
+            $display("> Memory  : ** IDLE **");
         end else begin
             $display("> Memory  : ", fshow(ex_mem));
         end
 
         if (mem_wb.common.isBubble) begin
-            $display("> WriteB  : ** BUBBLE **");
+            $display("> WriteB  : ** IDLE **");
         end else begin
             $display("> WriteB  : ", fshow(mem_wb));
         end
 
         //
-        // Check for traps (and update the program counter to the trap handler if one exists)
+        // Process the current cycle
         //
-        if (ex_mem_.common.trap matches tagged Valid .trap) begin
-            pc_ <- csrFile.trapController.beginTrap(ex_mem.common.pc, trap);
-            $display("> TRAP DETECTED: Jumping to $%0x", pc_);
-            flipEpoch = True;
-        end else begin
-            pc_ = (ex_mem_.cond ? ex_mem_.aluOutput : if_id_.npc);
-        end
+        IF_ID if_id_ = defaultValue;
+        ID_EX id_ex_ = defaultValue;
+        EX_MEM ex_mem_ = defaultValue;
+        MEM_WB mem_wb_ = defaultValue;
+        WB_OUT wb_out_ = defaultValue;
 
-        if (flipEpoch) begin
-            epoch <= ~epoch;
-        end
+        case (state)
+            FETCH: begin
+                if_id_  <- fetchStage.fetch(pc, ex_mem, epoch);
+                if (if_id_ != defaultValue) begin
+                    if_id <= if_id_;
+                    state <= DECODE;
+                end
+            end
 
-        //
-        // If any stage is stalled, all stages *before* that are
-        // also stalled
-        //
-        if (memoryStage.isStalled) begin
-`ifdef ENABLE_SPEW
-            $display("Memory Stage Stalled");
-`endif
-            mem_wb <= mem_wb;
-        end else if(detectLoadHazard(if_id_, id_ex_)) begin
-`ifdef ENABLE_SPEW
-            $display("Load Hazard - inserting bubble into EX");
-`endif
-            id_ex  <= defaultValue; // Don't issue an instruction - insert bubble
-            ex_mem <= ex_mem_;
-            mem_wb <= mem_wb_;
-            wb_out <= wb_out_;
-        end else if(if_id_.common.isBubble) begin
-            if_id  <= if_id_;
-            id_ex  <= id_ex_;
-            ex_mem <= ex_mem_;
-            mem_wb <= mem_wb_;
-            wb_out <= wb_out_;
-        end else begin
-            pc     <= pc_;
-            if_id  <= if_id_;
-            id_ex  <= id_ex_;
-            ex_mem <= ex_mem_;
-            mem_wb <= mem_wb_;
-            wb_out <= wb_out_;
-        end
+            DECODE: begin
+                id_ex_  <- decodeStage.decode(if_id, gprFile.gprReadPort1, gprFile.gprReadPort2, csrFile.csrReadPort);
+                if (id_ex_ != defaultValue) begin
+                    id_ex <= id_ex_;
+                    state <= EXECUTE;
+
+                    if_id <= defaultValue;
+                end
+            end
+
+            EXECUTE: begin
+                ex_mem_ <- executeStage.execute(id_ex, 
+                    tagged Invalid, // RS1 forward (not used on unpipelined CPUs) 
+                    tagged Invalid, // RS2 forward (not used on unpipelined CPUs)
+                    id_ex.epoch,    // Simple set the epoch to that contained in id_ex (epochs not implemented on unpipelined CPUs)
+                    csrFile.trapController, 
+                    csrFile.csrWritePermission);
+                if (ex_mem_ != defaultValue) begin
+                    ex_mem <= ex_mem_;
+                    state <= MEMORY_ACCESS;
+
+                    id_ex <= defaultValue;
+
+                    pc <= (ex_mem_.cond ? ex_mem_.aluOutput : pc + 4);
+                end
+            end
+
+            MEMORY_ACCESS: begin
+                mem_wb_ <- memoryStage.accessMemory(ex_mem);
+                if (mem_wb_ != defaultValue) begin
+                    mem_wb <= mem_wb_;
+                    state <= WRITEBACK;
+
+                    ex_mem <= defaultValue;
+                end
+            end
+
+            WRITEBACK: begin
+                wb_out_ <- writebackStage.writeback(mem_wb, gprFile.gprWritePort, csrFile.csrWritePort);
+                csrFile.incrementInstructionsRetiredCounter;
+
+                retiredInstruction.wset(RetiredInstruction {
+                    programCounter: wb_out_.common.pc,
+                    instruction:    wb_out_.common.ir
+                });
+
+                wb_out <= wb_out_;
+                state <= FETCH;
+
+                mem_wb <= defaultValue;
+            end
+        endcase
 
         //
         // Increment cycle counters
         //
         csrFile.incrementCycleCounters;
-
-        //
-        // Increment retirement counter and inform any clients 
-        // of the retired instruction (this is assuming the
-        // instruction wasn't a pipeline bubble)
-        //
-        if (!wb_out_.common.isBubble) begin
-            csrFile.incrementInstructionsRetiredCounter;
-
-            retiredInstruction.wset(RetiredInstruction {
-                programCounter: wb_out_.common.pc,
-                instruction:    wb_out_.common.ir
-            });
-        end
     endmethod
 endmodule

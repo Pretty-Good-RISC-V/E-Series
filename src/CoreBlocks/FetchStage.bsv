@@ -92,6 +92,8 @@ module mkFetchStage#(BranchPredictor branchPredictor)(FetchStage);
                         byteen: 'b1111,
                         address: npc
                     });
+
+                    nextState = WAITING_FOR_FETCH_REQUEST;
                 end
             end
         endcase

@@ -47,6 +47,10 @@ module mkTestHost(Empty);
     // Cycle counter
     Reg#(Bit#(XLEN)) cycle <- mkReg(0);    
     rule test(cpu.getState == READY);
+        if (cycle == 0) begin
+            programMemory.setTriggerAddress('h8000_1000);
+        end
+
         $display("> -----------------------------");
         $display("> Cycle   : %0d", cycle);
 
@@ -54,5 +58,13 @@ module mkTestHost(Empty);
         cpu.step;
 
         cycle <= cycle + 1;
+
+        // Check for memory triggers
+        if (programMemory.getTriggerState matches tagged Valid .triggerValue) begin
+            let testNumber = triggerValue >> 1;
+            if (testNumber == 0) $display ("    PASS");
+            else                 $display ("    FAIL <test_%0d>", testNumber);
+            $finish();
+        end
     endrule
 endmodule

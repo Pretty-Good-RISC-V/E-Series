@@ -1,0 +1,37 @@
+find_package(PGRVCommon)
+
+add_subdirectory(CSRs)
+
+add_library(CoreBlocks INTERFACE)
+add_library(CoreBlocks::CoreBlocks ALIAS CoreBlocks)
+
+target_include_directories(CoreBlocks INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}")
+target_link_libraries(CoreBlocks INTERFACE
+    PGRVCommon::PGRVCommon
+    CSRs::CSRs
+)
+
+#
+# Tests
+#
+file(COPY assets DESTINATION "${CMAKE_BINARY_DIR}")
+
+file(GLOB TEST_FILES "${CMAKE_CURRENT_SOURCE_DIR}/*_tb.bsv")
+foreach(TEST_FILE ${TEST_FILES})
+    get_filename_component(TEST_TARGET ${TEST_FILE} NAME_WE)
+    add_executable(${TEST_TARGET} ${TEST_FILE})
+    set_target_properties(${TEST_TARGET} PROPERTIES LINKER_LANGUAGE BSV)
+    target_compile_definitions(${TEST_TARGET} PUBLIC
+        ${BASE_ISA}
+        ${EXT_C}
+    )
+    target_link_libraries(${TEST_TARGET}
+        CSRs::CSRs
+        PGRVCommon::PGRVCommon
+        InstructionLogger::InstructionLogger
+    )
+    add_test(
+        NAME ${TEST_TARGET}
+        COMMAND "${CMAKE_SOURCE_DIR}/cmake/BSV-cmake/Wrappers/bsvtest" "${CMAKE_CURRENT_BINARY_DIR}/${TEST_TARGET}" 
+    )
+endforeach()

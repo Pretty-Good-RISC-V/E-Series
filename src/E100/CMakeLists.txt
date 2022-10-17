@@ -1,21 +1,19 @@
 find_package(PGRVCommon)
 
-add_subdirectory(CSRs)
+add_subdirectory(test)
 
-add_library(CPU INTERFACE)
-add_library(CPU::CPU ALIAS CPU)
+add_library(E100 INTERFACE)
+add_library(E100::E100 ALIAS E100)
 
-target_include_directories(CPU INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}")
-target_link_libraries(CPU INTERFACE
+target_include_directories(E100 INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}")
+target_link_libraries(E100 INTERFACE
     PGRVCommon::PGRVCommon
-    CSRs::CSRs
+    CoreBlocks::CoreBlocks
 )
 
 #
 # Tests
 #
-file(COPY assets DESTINATION "${CMAKE_BINARY_DIR}")
-
 file(GLOB TEST_FILES "${CMAKE_CURRENT_SOURCE_DIR}/*_tb.bsv")
 foreach(TEST_FILE ${TEST_FILES})
     get_filename_component(TEST_TARGET ${TEST_FILE} NAME_WE)
@@ -27,7 +25,7 @@ foreach(TEST_FILE ${TEST_FILES})
     )
     target_link_libraries(${TEST_TARGET}
         PGRVCommon::PGRVCommon
-        CSRs::CSRs
+        CoreBlocks::CoreBlocks
         InstructionLogger::InstructionLogger
     )
     add_test(

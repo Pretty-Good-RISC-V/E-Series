@@ -1,0 +1,60 @@
+find_package(RISCV_ISA_Tests)
+
+if ("${BASE_ISA}" STREQUAL "RV32")
+    set(ISA_TEST_BINARIES
+        # "${RISCV_ISA_TEST_BUILD_DIR}/src/riscv_isa_tests-build/isa/rv32mi-p-breakpoint" # Breakpoint Tests
+        "${RISCV_ISA_TEST_BUILD_DIR}/src/riscv_isa_tests-build/isa/rv32mi-p-csr"        # CSR tests
+        # "${RISCV_ISA_TEST_BUILD_DIR}/src/riscv_isa_tests-build/isa/rv32mi-p-illegal"    # Illegal instructino traps
+        # "${RISCV_ISA_TEST_BUILD_DIR}/src/riscv_isa_tests-build/isa/rv32mi-p-ma_addr"    # Misaligned LD/ST handling
+        # "${RISCV_ISA_TEST_BUILD_DIR}/src/riscv_isa_tests-build/isa/rv32mi-p-ma_fetch"   # Misaligned Fetch handling
+        # "${RISCV_ISA_TEST_BUILD_DIR}/src/riscv_isa_tests-build/isa/rv32mi-p-mcsr"       # Machine Mode CSR tests
+        # "${RISCV_ISA_TEST_BUILD_DIR}/src/riscv_isa_tests-build/isa/rv32mi-p-sbreak"     # EBREAK (formerly SBREAK) tests
+        # "${RISCV_ISA_TEST_BUILD_DIR}/src/riscv_isa_tests-build/isa/rv32mi-p-scall"      # ECALL (formerly SCALL) tests
+        # "${RISCV_ISA_TEST_BUILD_DIR}/src/riscv_isa_tests-build/isa/rv32mi-p-shamt"      # Illegal shamt tests
+    )
+endif()
+
+if ("${BASE_ISA}" STREQUAL "RV64")
+    set(ISA_TEST_BINARIES
+        "${RISCV_ISA_TEST_BUILD_DIR}/src/riscv_isa_tests-build/isa/rv64mi-p-access"     # Access Exception Tests
+        "${RISCV_ISA_TEST_BUILD_DIR}/src/riscv_isa_tests-build/isa/rv64mi-p-breakpoint" # Breakpoint Tests
+        "${RISCV_ISA_TEST_BUILD_DIR}/src/riscv_isa_tests-build/isa/rv64mi-p-csr"        # CSR tests
+        "${RISCV_ISA_TEST_BUILD_DIR}/src/riscv_isa_tests-build/isa/rv64mi-p-illegal"    # Illegal instructino traps
+        "${RISCV_ISA_TEST_BUILD_DIR}/src/riscv_isa_tests-build/isa/rv64mi-p-ma_addr"    # Misaligned LD/ST handling
+        "${RISCV_ISA_TEST_BUILD_DIR}/src/riscv_isa_tests-build/isa/rv64mi-p-ma_fetch"   # Misaligned Fetch handling
+        "${RISCV_ISA_TEST_BUILD_DIR}/src/riscv_isa_tests-build/isa/rv64mi-p-mcsr"       # Machine Mode CSR tests
+        "${RISCV_ISA_TEST_BUILD_DIR}/src/riscv_isa_tests-build/isa/rv64mi-p-sbreak"     # EBREAK (formerly SBREAK) tests
+        "${RISCV_ISA_TEST_BUILD_DIR}/src/riscv_isa_tests-build/isa/rv64mi-p-scall"      # ECALL (formerly SCALL) tests
+    )
+endif()
+
+foreach(ISA_TEST_BINARY ${ISA_TEST_BINARIES})
+    message("Creating ISA test: ${ISA_TEST_BINARY}")
+    get_filename_component(TEST_NAME "${ISA_TEST_BINARY}" NAME_WLE)
+    message("Test Commandline: ${CMAKE_SOURCE_DIR}/simlauncher --vcd ${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}.vcd --spike --log ${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}.trace.txt ${ISA_TEST_BINARY}")
+    set(TEST_INVOCATION 
+        "${CMAKE_BINARY_DIR}/simlauncher" 
+        --sim-host test/isa_tests/TestHost 
+        --vcd "${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}.vcd" 
+        --isa "${BASE_ISA}" 
+        --spike 
+        --check 
+        --max-cycles 80000 
+        --log "${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}" 
+        "${ISA_TEST_BINARY}"
+    )
+
+    configure_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/load_script.tcl.tmpl"
+        "${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}.tcl"
+    )
+
+    list(JOIN TEST_INVOCATION " " TEST_INVOCATION_STRING)
+    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}.sh" "${TEST_INVOCATION_STRING}")
+
+    add_test(
+        NAME "ISA_TEST_${TEST_NAME}"
+        COMMAND ${TEST_INVOCATION}
+        WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
+    )
+endforeach()

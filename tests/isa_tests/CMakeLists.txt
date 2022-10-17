@@ -1,17 +1,3 @@
-set(TEST_FILE "${CMAKE_CURRENT_SOURCE_DIR}/TestHost.bsv")
-
-get_filename_component(TEST_TARGET ${TEST_FILE} NAME_WE)
-add_executable(${TEST_TARGET} ${TEST_FILE})
-set_target_properties(${TEST_TARGET} PROPERTIES LINKER_LANGUAGE BSV)
-target_compile_definitions(${TEST_TARGET} PUBLIC
-    ${BASE_ISA}
-)
-target_link_libraries(${TEST_TARGET}
-    PGRVCommon::PGRVCommon
-    CPU::CPU
-    InstructionLogger::InstructionLogger
-)
-
 find_package(RISCV_ISA_Tests)
 
 if ("${BASE_ISA}" STREQUAL "RV32")
@@ -48,7 +34,7 @@ foreach(ISA_TEST_BINARY ${ISA_TEST_BINARIES})
     message("Test Commandline: ${CMAKE_SOURCE_DIR}/simlauncher --vcd ${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}.vcd --spike --log ${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}.trace.txt ${ISA_TEST_BINARY}")
     set(TEST_INVOCATION 
         "${CMAKE_BINARY_DIR}/simlauncher" 
-        --sim-host test/isa_tests/TestHost 
+        --sim-host ${CMAKE_CURRENT_BINARY_DIR}/TestHost 
         --vcd "${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}.vcd" 
         --isa "${BASE_ISA}" 
         --spike 
