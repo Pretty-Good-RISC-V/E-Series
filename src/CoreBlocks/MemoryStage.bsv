@@ -42,7 +42,7 @@ module mkMemoryStage(MemoryStage);
         let mem_wb = MEM_WB {
             common:     ex_mem.common,
             aluOutput:  ex_mem.aluOutput,
-            lmd:        0
+            lmd:        ex_mem.b   // For CSR, hold CSR writeback
         };
 
         let opcode          = ex_mem.common.ir[6:0];

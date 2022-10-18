@@ -89,7 +89,7 @@ module mkExecuteStage(ExecuteStage);
                         let branchResult   <- bru.isTaken(func3, a, b);
 
 `ifdef ENABLE_SPEW
-                        $display("EXECUTE: BRANCH - OP: %0b, $%0x, B: $%0x", func3, a, b);
+                        $display("EXECUTE: BRANCH - OP: %0b, A: $%0x, B: $%0x", func3, a, b);
                         $display("EXECUTE: BRANCH RESULT: ", fshow(branchResult));
 `endif
 

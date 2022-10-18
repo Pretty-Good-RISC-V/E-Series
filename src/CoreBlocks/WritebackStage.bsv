@@ -3,7 +3,7 @@ import CSRFile::*;
 import GPRFile::*;
 import PipelineRegisters::*;
 
-`undef ENABLE_SPEW
+`define ENABLE_SPEW
 
 interface WritebackStage;
     method ActionValue#(WB_OUT) writeback(MEM_WB mem_wb, GPRWritePort gprWritePort, CSRWritePort csrWritePort);
@@ -16,6 +16,9 @@ module mkWritebackStage(WritebackStage);
         let csr_   = mem_wb.common.ir[31:20];
 
         match { .rd, .gprValue, .csr, .csrValue } = case (opcode) matches
+            'b0010111: begin    // AUIPC
+                return tuple4(rd_, mem_wb.aluOutput, 0, 0);
+            end
             'b1110011: begin    // CSR
                 return tuple4(rd_, mem_wb.aluOutput, csr_, mem_wb.lmd);
             end

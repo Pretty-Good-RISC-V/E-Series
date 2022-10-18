@@ -167,8 +167,9 @@ module mkCSRFile(CSRFile);
                     csr_MEDELEG:    result.value = medeleg;
 
                     csr_MSTATUS:    result.value = pack(mstatus);
-                    csr_MCYCLE, csr_CYCLE:     
-                        result.value = mcycle;
+                    csr_MCYCLE, csr_CYCLE: begin
+                                    result.value = mcycle;
+                    end
                     csr_MSCRATCH:   result.value = mscratch;
                     csr_MIP:        result.value = mip;
                     csr_MIE:        result.value = mie;
@@ -184,6 +185,8 @@ module mkCSRFile(CSRFile);
                 endcase
             end
 
+            $display("---- CSR Read Index : ", fshow(index));
+            $display("---- CSR Read Result: ", fshow(result));
             return result;
         endactionvalue
     endfunction
@@ -216,6 +219,10 @@ module mkCSRFile(CSRFile);
                     default:      result.denied = True;
                 endcase   
             end
+
+            $display("---- CSR Write Index : ", fshow(index));
+            $display("---- CSR Write Value : ", value);
+            $display("---- CSR Write Result: ", fshow(result));
 
             return result;
         endactionvalue
@@ -336,7 +343,26 @@ module mkCSRFile(CSRFile);
         endmethod
 
         method ActionValue#(ProgramCounter) endTrap;
-            return 0;
+            ProgramCounter newProgramCounter = 'hDEADDEAD;
+
+            let readStatus <- readWithOffset1(currentPriv, csr_STATUS);
+            if (readStatus.denied == False) begin
+                MachineStatus mstatus = unpack(readStatus.value);
+                let newPrivilegeLevel = mstatus.mpp;
+                mstatus.mie = mstatus.mpie;
+                mstatus.mpie = False;
+
+                // Attempt to update MSTATUS.  The current privilege level may prevent this.
+                let writeStatus <- writeInternal(csr_MSTATUS, pack(mstatus));
+                if (writeStatus.denied == False) begin
+                    currentPriv <= newPrivilegeLevel;
+                    readStatus <- readWithOffset1(currentPriv, csr_EPC); 
+                    if (readStatus.denied == False) begin
+                        newProgramCounter = readStatus.value;
+                    end
+                end
+            end
+            return newProgramCounter;        
         endmethod
     endinterface
 

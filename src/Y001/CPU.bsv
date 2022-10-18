@@ -213,12 +213,11 @@ module mkCPU#(
                     csrFile.trapController, 
                     csrFile.csrWritePermission);
                 if (ex_mem_ != defaultValue) begin
+                    pc <= (ex_mem_.cond ? ex_mem_.aluOutput : pc + 4);
                     ex_mem <= ex_mem_;
                     state <= MEMORY_ACCESS;
 
                     id_ex <= defaultValue;
-
-                    pc <= (ex_mem_.cond ? ex_mem_.aluOutput : pc + 4);
                 end
             end
 
