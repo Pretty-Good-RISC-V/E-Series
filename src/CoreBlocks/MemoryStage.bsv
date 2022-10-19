@@ -40,9 +40,9 @@ module mkMemoryStage(MemoryStage);
 
     method ActionValue#(MEM_WB) accessMemory(EX_MEM ex_mem);
         let mem_wb = MEM_WB {
-            common:     ex_mem.common,
-            aluOutput:  ex_mem.aluOutput,
-            lmd:        ex_mem.b   // For CSR, hold CSR writeback
+            common:             ex_mem.common,
+            gprWritebackValue:  ex_mem.aluOutput,
+            csrWritebackValue:  ex_mem.storeValueOrCSRWriteback
         };
 
         let opcode          = ex_mem.common.ir[6:0];
@@ -65,7 +65,7 @@ module mkMemoryStage(MemoryStage);
                         tval: ex_mem.aluOutput
                     };
                 end else if (!isStore) begin
-                    mem_wb.lmd = response.data;
+                    mem_wb.gprWritebackValue = response.data;
                 end
                 state <= WAITING_FOR_MEMORY_REQUEST;
             end else begin
@@ -77,7 +77,7 @@ module mkMemoryStage(MemoryStage);
         end else if (!isValid(ex_mem.common.trap) && isLoadStore) begin
             let memoryRequest = MemoryRequest {
                 address: ex_mem.aluOutput,
-                data: ex_mem.b,
+                data: ex_mem.storeValueOrCSRWriteback,
                 byteen: getByteEnable(func3),
                 write: isStore
             };

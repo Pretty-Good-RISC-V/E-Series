@@ -44,11 +44,11 @@ function Tuple2#(Maybe#(Word), Maybe#(Word)) getForwardedOperands(ID_EX id_ex, E
     // a load from memory.
     if (mem_wb_has_rd) begin
         if(id_ex_has_rs1 && mem_wb_rd == id_ex_rs1) begin
-            rs1Forward = tagged Valid mem_wb.aluOutput;
+            rs1Forward = tagged Valid mem_wb.gprWritebackValue;
         end
 
         if (id_ex_has_rs2 && mem_wb_rd == id_ex_rs2) begin
-            rs2Forward = tagged Valid mem_wb.aluOutput;
+            rs2Forward = tagged Valid mem_wb.gprWritebackValue;
         end
     end
 

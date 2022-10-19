@@ -22,7 +22,7 @@ module mkExecuteStage_tb(Empty);
                     let id_ex = ID_EX { common: PipelineRegisterCommon { ir: 'h00a00093, pc: 'h00000000, isBubble: False, trap: tagged Invalid  }, epoch: 'h0, npc: 'h00000004, a: 'h00000000, b: 'h00000000, isBValid: True, imm: 'h0000000a };
                     let result <- dut.execute(id_ex, tagged Invalid, tagged Invalid, epoch, csrFile.trapController, csrFile.csrWritePermission);
 
-                    let expected = EX_MEM { common: PipelineRegisterCommon { ir: 'h00a00093, pc: 'h00000000, isBubble: False, trap: tagged Invalid  }, aluOutput: 'h0000000a, b: 'h00000000, cond: False };
+                    let expected = EX_MEM { common: PipelineRegisterCommon { ir: 'h00a00093, pc: 'h00000000, isBubble: False, trap: tagged Invalid  }, aluOutput: 'h0000000a, storeValueOrCSRWriteback: 'h00000000, cond: False };
 
                     $display("result  : ", fshow(result));
                     $display("expected: ", fshow(expected));
@@ -36,7 +36,7 @@ module mkExecuteStage_tb(Empty);
                     let id_ex = ID_EX { common: PipelineRegisterCommon { ir: 'h01400113, pc: 'h00000004, isBubble: False, trap: tagged Invalid  }, epoch: 'h0, npc: 'h00000008, a: 'h00000000, b: 'h00000000, isBValid: True, imm: 'h00000014 };
                     let result <- dut.execute(id_ex, tagged Invalid, tagged Invalid, epoch, csrFile.trapController, csrFile.csrWritePermission);
 
-                    let expected = EX_MEM { common: PipelineRegisterCommon { ir: 'h01400113, pc: 'h00000004, isBubble: False, trap: tagged Invalid  }, aluOutput: 'h000000014, b: 'h00000000, cond: False };
+                    let expected = EX_MEM { common: PipelineRegisterCommon { ir: 'h01400113, pc: 'h00000004, isBubble: False, trap: tagged Invalid  }, aluOutput: 'h000000014, storeValueOrCSRWriteback: 'h00000000, cond: False };
                     
                     $display("result  : ", fshow(result));
                     $display("expected: ", fshow(expected));
@@ -50,7 +50,7 @@ module mkExecuteStage_tb(Empty);
                     let id_ex = ID_EX { common: PipelineRegisterCommon { ir: 'h01e00493, pc: 'h00000008, isBubble: False, trap: tagged Invalid  }, epoch: 'h0, npc: 'h0000000c, a: 'h00000000, b: 'h00000000, isBValid: True, imm: 'h0000001e };
                     let result <- dut.execute(id_ex, tagged Invalid, tagged Invalid, epoch, csrFile.trapController, csrFile.csrWritePermission);
 
-                    let expected = EX_MEM { common: PipelineRegisterCommon { ir: 'h01e00493, pc: 'h00000008, isBubble: False, trap: tagged Invalid  }, aluOutput: 'h00000001e, b: 'h00000000, cond: False };
+                    let expected = EX_MEM { common: PipelineRegisterCommon { ir: 'h01e00493, pc: 'h00000008, isBubble: False, trap: tagged Invalid  }, aluOutput: 'h00000001e, storeValueOrCSRWriteback: 'h00000000, cond: False };
                     
                     $display("result  : ", fshow(result));
                     $display("expected: ", fshow(expected));
@@ -64,7 +64,7 @@ module mkExecuteStage_tb(Empty);
                     let id_ex = ID_EX { common: PipelineRegisterCommon { ir: 'h002081b3, pc: 'h0000000c, isBubble: False, trap: tagged Invalid  }, epoch: 'h0, npc: 'h0000000c, a: 'h0000000a, b: 'h00000014, isBValid: True, imm: 'h00000002 };
                     let result <- dut.execute(id_ex, tagged Invalid, tagged Invalid, epoch, csrFile.trapController, csrFile.csrWritePermission);
 
-                    let expected = EX_MEM { common: PipelineRegisterCommon { ir: 'h002081b3, pc: 'h0000000c, isBubble: False, trap: tagged Invalid  }, aluOutput: 'h00000001e, b: 'h00000014, cond: False };
+                    let expected = EX_MEM { common: PipelineRegisterCommon { ir: 'h002081b3, pc: 'h0000000c, isBubble: False, trap: tagged Invalid  }, aluOutput: 'h00000001e, storeValueOrCSRWriteback: 'h00000014, cond: False };
                     
                     $display("result  : ", fshow(result));
                     $display("expected: ", fshow(expected));
@@ -78,7 +78,7 @@ module mkExecuteStage_tb(Empty);
                     let id_ex = ID_EX { common: PipelineRegisterCommon { ir: 'h00919463, pc: 'h00000010, isBubble: False, trap: tagged Invalid  }, epoch: 'h0, npc: 'h00000014, a: 'h0000001e, b: 'h0000001e, isBValid: True, imm: 'h00000008 };
                     let result <- dut.execute(id_ex, tagged Invalid, tagged Invalid, epoch, csrFile.trapController, csrFile.csrWritePermission);
 
-                    let expected = EX_MEM { common: PipelineRegisterCommon { ir: 'h00919463, pc: 'h00000010, isBubble: False, trap: tagged Invalid  }, aluOutput: 'h000000018, b: 'h0000001e, cond: False };
+                    let expected = EX_MEM { common: PipelineRegisterCommon { ir: 'h00919463, pc: 'h00000010, isBubble: False, trap: tagged Invalid  }, aluOutput: 'h000000018, storeValueOrCSRWriteback: 'h0000001e, cond: False };
                     
                     $display("result  : ", fshow(result));
                     $display("expected: ", fshow(expected));
@@ -92,7 +92,7 @@ module mkExecuteStage_tb(Empty);
                     let id_ex = ID_EX { common: PipelineRegisterCommon { ir: 'h0000006f, pc: 'h00000014, isBubble: False, trap: tagged Invalid  }, epoch: 'h0, npc: 'h00000018, a: 'h00000000, b: 'h00000000, isBValid: True, imm: 'h00000000 };
                     let result <- dut.execute(id_ex, tagged Invalid, tagged Invalid, epoch, csrFile.trapController, csrFile.csrWritePermission);
 
-                    let expected = EX_MEM { common: PipelineRegisterCommon { ir: 'h0000006f, pc: 'h00000014, isBubble: False, trap: tagged Invalid  }, aluOutput: 'h000000014, b: 'h0000000, cond: True };
+                    let expected = EX_MEM { common: PipelineRegisterCommon { ir: 'h0000006f, pc: 'h00000014, isBubble: False, trap: tagged Invalid  }, aluOutput: 'h000000014, storeValueOrCSRWriteback: 'h0000000, cond: True };
                     
                     $display("result  : ", fshow(result));
                     $display("expected: ", fshow(expected));
@@ -106,7 +106,7 @@ module mkExecuteStage_tb(Empty);
                     let id_ex = ID_EX { common: PipelineRegisterCommon { ir: 'h0000006f, pc: 'h00000018, isBubble: False, trap: tagged Invalid  }, epoch: 'h0, npc: 'h00000018, a: 'h00000000, b: 'h00000000, isBValid: True, imm: 'h00000000 };
                     let result <- dut.execute(id_ex, tagged Invalid, tagged Invalid, epoch, csrFile.trapController, csrFile.csrWritePermission);
 
-                    let expected = EX_MEM { common: PipelineRegisterCommon { ir: 'h0000006f, pc: 'h00000018, isBubble: False, trap: tagged Invalid  }, aluOutput: 'h000000018, b: 'h0000000, cond: True };
+                    let expected = EX_MEM { common: PipelineRegisterCommon { ir: 'h0000006f, pc: 'h00000018, isBubble: False, trap: tagged Invalid  }, aluOutput: 'h000000018, storeValueOrCSRWriteback: 'h0000000, cond: True };
                     
                     $display("result  : ", fshow(result));
                     $display("expected: ", fshow(expected));

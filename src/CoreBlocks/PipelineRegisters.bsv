@@ -70,16 +70,16 @@ endinstance
 typedef struct {
     PipelineRegisterCommon common;
     Word                   aluOutput;
-    Word                   b;           // Store value
+    Word                   storeValueOrCSRWriteback;
     Bool                   cond;        // Branch taken?
 } EX_MEM deriving(Bits, Eq, FShow);
 
 instance DefaultValue #(EX_MEM);
     defaultValue = EX_MEM {
-        common:     defaultValue,
-        aluOutput:  0,
-        b:          0,
-        cond:       False
+        common:                     defaultValue,
+        aluOutput:                  0,
+        storeValueOrCSRWriteback:   0,
+        cond:                       False
     };
 endinstance
 
@@ -88,15 +88,15 @@ endinstance
 //
 typedef struct {
     PipelineRegisterCommon common;
-    Word                   aluOutput;
-    Word                   lmd;         // Load result
+    Word                   gprWritebackValue;
+    Word                   csrWritebackValue;
 } MEM_WB deriving(Bits, Eq, FShow);
 
 instance DefaultValue #(MEM_WB);
     defaultValue = MEM_WB {
-        common:     defaultValue,
-        aluOutput:  0,
-        lmd:        0
+        common:             defaultValue,
+        gprWritebackValue:  0,
+        csrWritebackValue:  0
     };
 endinstance
 

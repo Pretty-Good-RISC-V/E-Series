@@ -17,19 +17,19 @@ module mkWritebackStage(WritebackStage);
 
         match { .rd, .gprValue, .csr, .csrValue } = case (opcode) matches
             'b0010111: begin    // AUIPC
-                return tuple4(rd_, mem_wb.aluOutput, 0, 0);
+                return tuple4(rd_, mem_wb.gprWritebackValue, 0, 0);
             end
             'b1110011: begin    // CSR
-                return tuple4(rd_, mem_wb.aluOutput, csr_, mem_wb.lmd);
+                return tuple4(rd_, mem_wb.gprWritebackValue, csr_, mem_wb.csrWritebackValue);
             end
             'b0000011: begin    // LOAD
-                return tuple4(rd_, mem_wb.lmd, 0, 0);
+                return tuple4(rd_, mem_wb.gprWritebackValue, 0, 0);
             end
             'b0?10011: begin    // ALU
-                return tuple4(rd_, mem_wb.aluOutput, 0, 0);
+                return tuple4(rd_, mem_wb.gprWritebackValue, 0, 0);
             end
             'b1100111: begin    // JALR
-                return tuple4(rd_, mem_wb.aluOutput, 0, 0);
+                return tuple4(rd_, mem_wb.gprWritebackValue, 0, 0);
             end
             default: begin
                 return tuple4(0, 0, 0, 0);

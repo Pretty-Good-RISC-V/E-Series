@@ -41,6 +41,7 @@ module mkExecuteStage(ExecuteStage);
 `endif
 
         Word aluOutput = ?;
+        Word storeValueOrCSRWriteback = ?;
         Bool cond      = False;
 
         let branchTaken      = False;
@@ -48,7 +49,7 @@ module mkExecuteStage(ExecuteStage);
         let csr              = id_ex.common.ir[31:20];
         let isCSRImmediate   = unpack(id_ex.common.ir[14]);
         let pcOffset         = unpack(id_ex.common.pc) + signedImmediate;
-
+        
         // Check if instruction epoch matches the pipline epoch.  If not,
         // the instruction stream for this instruction is stale.
         if (id_ex.epoch != epoch) begin
@@ -176,7 +177,7 @@ module mkExecuteStage(ExecuteStage);
                     // System (CSRRW/CSRRWI)
                     'b????????????_?????_?01_?????_1110011: begin
                         aluOutput = (isCSRImmediate ? id_ex.imm : id_ex.b); // GPRWriteback
-                        b = id_ex.a;                                        // CSRWriteback
+                        storeValueOrCSRWriteback = id_ex.a;                 // CSRWriteback
 
                         if (csrWritePermission.isWriteable(csr)) begin
                             illegalOperation = False;
@@ -186,7 +187,7 @@ module mkExecuteStage(ExecuteStage);
                     // System (CSRRS/CSRRSI)
                     'b????????????_?????_?10_?????_1110011: begin
                         aluOutput = (isCSRImmediate ? id_ex.imm : id_ex.b); // GPRWriteback
-                        b = id_ex.a | aluOutput;                            // CSRWriteback
+                        storeValueOrCSRWriteback = id_ex.a | aluOutput;     // CSRWriteback
 
                         // if none of the mask bits are set, no writing to the CSR will
                         // occur
@@ -202,7 +203,7 @@ module mkExecuteStage(ExecuteStage);
                     // System (CSRRC/CSRRCI)
                     'b????????????_?????_?11_?????_1110011: begin
                         aluOutput = (isCSRImmediate ? id_ex.imm : id_ex.b); // GPRWriteback
-                        b = ~id_ex.a & aluOutput;                           // CSRWriteback
+                        storeValueOrCSRWriteback = ~id_ex.a & aluOutput;    // CSRWriteback
 
                         // if none of the mask bits are set, no writing to the CSR will
                         // occur
@@ -234,7 +235,7 @@ module mkExecuteStage(ExecuteStage);
                     trap:       trap
                 },
                 aluOutput: aluOutput,
-                b: b,
+                storeValueOrCSRWriteback: storeValueOrCSRWriteback,
                 cond: branchTaken
             };
         end
